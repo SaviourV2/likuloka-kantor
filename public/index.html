@@ -337,7 +337,7 @@ aside.side{display:flex;flex-direction:column;gap:14px;min-width:0}
 (() => {
 'use strict';
 
-/* ---------- data (used when /api/status is not available) ---------- */
+/* ---------- data (used when api/status is not available) ---------- */
 const SAMPLE = {
   asOf: '2026-11-05',
   bell: [
@@ -711,7 +711,7 @@ function merge(base, board, live){
 async function act(body, btn){
   if (btn) btn.disabled = true;
   try {
-    const r = await fetch('/api/card', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const r = await fetch(new URL('api/card', location.href), { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
     await refresh();
   } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Gagal, coba lagi'; } }
@@ -838,7 +838,7 @@ function renderVilla(){
 // Desks and their cards: the Ops run's status when there is one (else the desk list without the sample cards),
 // plus Kevin's own tasks and approvals and the live cards the website computes from its data. Refreshed every minute.
 async function fetchData(){
-  const r = await fetch('/api/status', { credentials: 'same-origin', headers: { accept: 'application/json' }, cache: 'no-store' });
+  const r = await fetch(new URL('api/status', location.href), { credentials: 'same-origin', headers: { accept: 'application/json' }, cache: 'no-store' });
   const ct = r.headers.get('content-type') || '';
   if (!r.ok || !ct.includes('json')) return null;
   const s = await r.json();

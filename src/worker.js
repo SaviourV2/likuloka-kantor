@@ -6,7 +6,8 @@ import { checkAccess } from './access.js';
 import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
 
-const SITE = 'https://likuloka.com';   // the main site's /admin pages that live cards link to
+const MAIN_HOST = 'likuloka.com';
+const SITE = 'https://' + MAIN_HOST;   // the main site's /admin pages that live cards link to
 const asList = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
 const canSeeKantor = (who, env) => who.email === 'dev@localhost' || asList(env.KANTOR_EMAILS).includes(who.email);
 
@@ -94,18 +95,18 @@ async function kantorLive(env) {
 
 export default {
   async fetch(req, env) {
-    const url = new URL(req.url), p = url.pathname, m = req.method;
+    const url = new URL(req.url), m = req.method;
+    // Served at kantor.likuloka.com/ and, through likuloka.com's service binding, at likuloka.com/admin/kantor/
+    // (behind the same Cloudflare Access login as /admin). Paths are the same after the prefix.
+    const p = url.pathname.replace(/^\/admin\/kantor(?=\/|$)/, '') || '/';
     try {
       const a = await checkAccess(req, env), who = a.who;
       if (!who || !canSeeKantor(who, env)) {
         const why = a.why || 'email ini tidak terdaftar untuk Kantor';
         // Not signed in yet: send the browser to the Cloudflare Access login, which comes back here afterwards.
         // ?masuk=1 marks the way back, so a hostname Access does not cover shows the reason instead of looping.
-        if (a.login && !p.startsWith('/api/') && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
-          const back = url.pathname + (url.search ? url.search + '&' : '?') + 'masuk=1';
-          const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${env.ACCESS_AUD.split(',')[0].trim()}&redirect_url=${encodeURIComponent(back)}`;
-          return Response.redirect(login, 302);
-        }
+        // Not signed in on kantor.likuloka.com: go to likuloka.com/admin/kantor/, which Access protects (login, then back).
+        if (a.login && !p.startsWith('/api/') && url.hostname !== MAIN_HOST) return Response.redirect(`https://${MAIN_HOST}/admin/kantor/`, 302);
         if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
         const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + a.aud, a.iss && 'Issuer: ' + a.iss].filter(Boolean).join('\n');
         return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
@@ -120,7 +121,7 @@ export default {
       }
       if (p === '/api/card' && m === 'POST') { const r = await kantorCard(env, await body(req), who); return r instanceof Response ? r : json(r); }
       if (p.startsWith('/api/')) return json({ error: 'Not found' }, 404);
-      const res = await env.ASSETS.fetch(req);
+      const res = await env.ASSETS.fetch(new Request(new URL(p, url), req));
       const out = new Response(res.body, res); out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
       return out;
     } catch (e) {
