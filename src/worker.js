@@ -2,7 +2,7 @@
 // Its own Worker and repo, on the same D1 database as likuloka.com (it reads the site's tables and owns
 // ops_settings 'kantor_status' / 'kantor_board' and the villa_* tables). Cloudflare Access sits in front of the
 // whole hostname; the worker checks the Access JWT again and lets only KANTOR_EMAILS in.
-import { verifyAccess } from './access.js';
+import { checkAccess } from './access.js';
 import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
 
@@ -96,10 +96,13 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url), p = url.pathname, m = req.method;
     try {
-      const who = await verifyAccess(req, env);
+      const a = await checkAccess(req, env), who = a.who;
       if (!who || !canSeeKantor(who, env)) {
-        if (p.startsWith('/api/')) return json({ error: who ? 'Khusus Kevin' : 'Sign-in required' }, who ? 403 : 401);
-        return new Response('Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.', { status: who ? 403 : 401, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+        const why = a.why || 'email ini tidak terdaftar untuk Kantor';
+        if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
+        const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + a.aud, a.iss && 'Issuer: ' + a.iss].filter(Boolean).join('\n');
+        return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
+          { status: 401, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
       }
       if (p === '/api/status' && m === 'GET') {
         const [status, board, live, villa] = await Promise.all([getSetting(env, 'kantor_status', null), getSetting(env, KANTOR_BOARD, null), kantorLive(env),

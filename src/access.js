@@ -30,6 +30,34 @@ async function jwks(env) {
 
 /** Returns { email, role } for a signed-in owner ('owner') or office team member ('team'), or null.
  *  Team emails (TEAM_EMAILS) may only open the pages and API listed in TEAM_PAGES / TEAM_API in worker.js. */
+/** Like verifyAccess, but returns { who } or { why, aud?, email? } so the page can say what is wrong. */
+export async function checkAccess(req, env) {
+  const why = (w, x = {}) => ({ who: null, why: w, ...x });
+  const url = new URL(req.url);
+  if (env.DEV_BYPASS_AUTH === '1' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return { who: { email: 'dev@localhost', role: 'owner' } };
+  if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return why('ACCESS_TEAM_DOMAIN / ACCESS_AUD belum diisi');
+  const token = req.headers.get('cf-access-jwt-assertion') || cookie(req, 'CF_Authorization');
+  if (!token) return why('tidak ada token Cloudflare Access (hostname kantor.likuloka.com belum dilindungi Access)');
+  const parts = token.split('.');
+  if (parts.length !== 3) return why('token rusak');
+  let header, payload;
+  try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); } catch { return why('token rusak'); }
+  const t = Math.floor(Date.now() / 1000);
+  if (!payload.exp || payload.exp < t) return why('token kedaluwarsa, buka ulang halaman');
+  const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  const allowed = String(env.ACCESS_AUD).split(',').map(x => x.trim());
+  if (!aud.some(a => allowed.includes(a))) return why('aplikasi Access berbeda (AUD tidak cocok)', { aud: aud.join(',') });
+  if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return why('team domain Access berbeda', { iss: payload.iss });
+  const jwk = (await jwks(env)).find(k => k.kid === header.kid);
+  if (!jwk) return why('kunci Access tidak ditemukan');
+  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+  if (!(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`)))) return why('tanda tangan token tidak valid');
+  const email = String(payload.email || '').toLowerCase();
+  const list = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
+  if (!list(env.KANTOR_EMAILS).includes(email)) return why('email ini tidak terdaftar untuk Kantor', { email });
+  return { who: { email, role: 'owner' } };
+}
+
 export async function verifyAccess(req, env) {
   const url = new URL(req.url);
   // Local development only: `wrangler dev` on localhost with DEV_BYPASS_AUTH=1 in .dev.vars.
