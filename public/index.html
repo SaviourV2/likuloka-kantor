@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Kantor Mochi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: one office floor drawn on a fixed 1200x780 stage that scales to the column, side panel beside it (stacks under it on phones). */
+:root{
+  --bg:#EFE8DC; --panel:#F8F4EC; --card:#FFFFFF; --line:#DDD2C1; --fg:#2E2B28; --muted:#675E55;
+  --floor:#E9DCC6; --plank:rgba(160,128,88,.13); --walk:#F3EBDD; --walk-edge:#D7C7AE;
+  --wood:#C9A97E; --wood-dark:#A8865B; --wall:#F6F1E8; --shoji:#FBF8F2; --sage:#9FAE8F; --sage-dark:#7F8F70;
+  --ink:#2E2B28; --alert:#C2502E; --ok:#7E9A69; --bell:#A87A12; --sand:#ECE3D2;
+  --shadow:rgba(46,43,40,.14);
+  --f-display:'Zen Maru Gothic', ui-rounded, 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+  --f-body:'Zen Kaku Gothic New', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#1F1C19; --panel:#26221E; --card:#2E2924; --line:#40392F; --fg:#F1EADF; --muted:#B8AC9C;
+  --floor:#3A3027; --plank:rgba(0,0,0,.18); --walk:#4A3F33; --walk-edge:#5E5142;
+  --wood:#8C6E4C; --wood-dark:#6E5439; --wall:#2B2621; --shoji:#3B342C; --sage:#6F7D62; --sage-dark:#59674D;
+  --alert:#E2704C; --ok:#9DB88A; --bell:#E0B04A; --sand:#463C30; --shadow:rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1F1C19; --panel:#26221E; --card:#2E2924; --line:#40392F; --fg:#F1EADF; --muted:#B8AC9C;
+  --floor:#3A3027; --plank:rgba(0,0,0,.18); --walk:#4A3F33; --walk-edge:#5E5142;
+  --wood:#8C6E4C; --wood-dark:#6E5439; --wall:#2B2621; --shoji:#3B342C; --sage:#6F7D62; --sage-dark:#59674D;
+  --alert:#E2704C; --ok:#9DB88A; --bell:#E0B04A; --sand:#463C30; --shadow:rgba(0,0,0,.35); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body)}
+.wrap{padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 32px;max-width:1640px;margin-inline:auto;display:flex;flex-direction:column;gap:16px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+header.top h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(22px,3vw,30px);text-wrap:balance}
+header.top p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.chip{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1020px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.stage-box{position:relative;width:100%;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--floor)}
+.stage{position:absolute;left:0;top:0;width:1200px;height:780px;transform-origin:0 0;overflow:hidden;
+  background:var(--floor);background-image:repeating-linear-gradient(90deg, transparent 0 79px, var(--plank) 79px 80px)}
+.zone{position:absolute}
+.wall{left:0;top:0;width:1200px;height:104px;background:var(--wall);border-bottom:6px solid var(--wood)}
+.window{position:absolute;top:16px;height:70px;width:150px;background:var(--shoji);border:4px solid var(--wood-dark);border-radius:4px;
+  background-image:linear-gradient(var(--wood-dark),var(--wood-dark)),linear-gradient(var(--wood-dark),var(--wood-dark));background-size:2px 100%,100% 2px;background-position:50% 0,0 50%;background-repeat:no-repeat}
+.lantern{position:absolute;width:40px;height:46px;border-radius:50%;background:var(--shoji);box-shadow:0 0 30px 10px rgba(250,230,190,.35);
+  background-image:repeating-linear-gradient(0deg, transparent 0 7px, rgba(120,100,80,.25) 7px 8px)}
+.lantern::before{content:"";position:absolute;left:50%;top:-30px;width:2px;height:30px;background:var(--wood-dark)}
+.walk{position:absolute;background:var(--walk);border:2px dashed var(--walk-edge);border-radius:28px}
+.plant{position:absolute;width:52px;height:52px;border-radius:50%;background:var(--sage);box-shadow:14px -12px 0 -8px var(--sage-dark),-12px -9px 0 -10px var(--sage)}
+.plant::after{content:"";position:absolute;left:12px;top:40px;width:28px;height:26px;border-radius:5px 5px 11px 11px;background:var(--wood)}
+.screen{position:absolute;width:10px;height:70px;border-radius:3px;background:var(--shoji);border:2px solid var(--wood-dark)}
+.canteen{left:24px;top:640px;width:540px;height:128px;border-radius:18px;background:var(--wall);border:1px solid var(--line)}
+.garden{left:636px;top:640px;width:540px;height:128px;border-radius:18px;background:var(--sand);border:1px solid var(--line);
+  background-image:repeating-radial-gradient(circle at 120px 70px, transparent 0 9px, rgba(140,120,90,.18) 9px 10px)}
+.zone-label{position:absolute;font-family:var(--f-display);font-weight:700;font-size:14px;color:var(--muted);letter-spacing:.04em}
+.noren{position:absolute;display:flex;gap:4px}
+.noren span{width:22px;height:36px;border-radius:0 0 5px 5px;background:#4A5A4C;color:#F6F1E8;font-size:11px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px}
+.machine{position:absolute;width:56px;height:76px;border-radius:9px;background:#3A3631;box-shadow:inset 0 -7px 0 #2A2723}
+.machine::before{content:"";position:absolute;left:9px;top:9px;width:38px;height:14px;border-radius:3px;background:var(--sage)}
+.machine::after{content:"";position:absolute;left:18px;bottom:12px;width:20px;height:16px;border-radius:0 0 6px 6px;background:#F7F2EA}
+.counter{position:absolute;height:22px;border-radius:8px;background:var(--wood);box-shadow:inset 0 -5px 0 var(--wood-dark)}
+.table-low{position:absolute;width:150px;height:20px;border-radius:999px;background:var(--wood);box-shadow:inset 0 -5px 0 var(--wood-dark)}
+.cushion{position:absolute;width:38px;height:14px;border-radius:999px;background:#B9C4AA}
+.stone{position:absolute;border-radius:50%;background:#A39A8C;box-shadow:inset -4px -5px 0 rgba(0,0,0,.12)}
+.bench{position:absolute;width:130px;height:18px;border-radius:6px;background:var(--wood);box-shadow:inset 0 -5px 0 var(--wood-dark)}
+.steam{position:absolute;width:5px;height:14px;border-radius:5px;background:rgba(255,255,255,.85);animation:steam 2.4s ease-out infinite}
+
+/* desks */
+.desk{position:absolute;width:118px;padding:0;border:0;background:none;cursor:pointer;font:inherit;color:inherit;text-align:center}
+.desk .top{position:relative;height:46px;border-radius:9px;background:var(--wood);box-shadow:inset 0 -6px 0 var(--wood-dark), 0 6px 0 -2px var(--shadow)}
+.desk .mon{position:absolute;left:44px;top:-18px;width:30px;height:22px;border-radius:3px;background:#3A3631;border:2px solid #2A2723}
+.desk .mon::after{content:"";position:absolute;left:11px;bottom:-8px;width:4px;height:6px;background:#2A2723}
+.desk .lamp{position:absolute;right:9px;top:9px;width:11px;height:11px;border-radius:50%;background:var(--ok)}
+.desk .lamp.red{background:var(--alert);animation:glow 1.4s ease-in-out infinite}
+.desk .stack{position:absolute;left:9px;bottom:13px;display:flex;flex-direction:column-reverse;gap:2px}
+.desk .stack i{display:block;width:24px;height:4px;border-radius:1px;background:#FFFDF8;box-shadow:0 1px 0 rgba(0,0,0,.12)}
+.desk .cup{position:absolute;right:28px;top:22px;width:10px;height:10px;border-radius:0 0 4px 4px;background:#FFFDF8}
+.desk .plate{margin-top:8px;display:inline-flex;flex-direction:column;gap:1px;padding:4px 10px;border-radius:10px;background:var(--card);border:1px solid var(--line);max-width:150px}
+.desk .plate b{font-family:var(--f-display);font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;justify-content:center;white-space:nowrap}
+.desk .plate b::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--dot);box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.desk .plate small{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk.sel .plate{border-color:var(--fg);box-shadow:0 0 0 2px var(--fg)}
+.desk.empty .top{background:transparent;border:2px dashed var(--walk-edge);box-shadow:none}
+.desk:focus-visible{outline:none}.desk:focus-visible .plate{box-shadow:0 0 0 3px var(--bell)}
+
+/* slimes */
+.mochi{position:absolute;left:0;top:0;width:76px;height:68px;padding:0;border:0;background:none;cursor:pointer;will-change:transform}
+.mochi:focus-visible{outline:3px solid var(--bell);outline-offset:4px;border-radius:40%}
+.mochi .body{position:absolute;inset:0;transform-origin:50% 100%}
+.mochi svg{width:100%;height:100%;overflow:visible;display:block}
+.face *{fill:var(--ink)}
+.face .ln{fill:none;stroke:var(--ink);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+.face .thick{stroke-width:3.6}
+.face .white{fill:#FFFFFF;stroke:var(--ink);stroke-width:1.6}
+.face .tear{fill:#8EC0E4}
+.face .mouth{fill:#7A3B3B}
+.face .star{fill:#E2A93B}
+.blush{fill:rgba(228,120,128,.45);transition:transform .2s, opacity .2s;transform-box:fill-box;transform-origin:center}
+.mochi.shy .blush{fill:rgba(228,100,110,.75);transform:scale(1.6,1.5)}
+.mochi.angry .tint{opacity:.22}
+.tint{opacity:0;transition:opacity .25s}
+.mochi.walking .body{animation:hop .5s ease-in-out infinite}
+.mochi.working .body{animation:bob 1.6s ease-in-out infinite}
+.mochi.idle .body{animation:bob 3.2s ease-in-out infinite}
+.mochi.stuck .body{animation:squish .9s ease-in-out infinite}
+.mochi.r-shake .body{animation:shake .12s linear infinite}
+.mochi.r-jump .body{animation:jump .45s ease-out 2}
+.mochi.r-nod .body{animation:nod .35s ease-in-out 3}
+.mochi.r-hide .body{animation:none;transform:scale(.7,.55) translateY(14px);opacity:.75;transition:transform .3s}
+.mochi.r-spin .body{animation:spin .6s ease-in-out}
+.mochi.flip svg{transform:scaleX(-1)}
+.mochi.flip svg .face, .mochi.flip svg .blushes{transform:none}
+
+.fx{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);pointer-events:none;display:flex;flex-direction:column;align-items:center}
+.bubble{margin-bottom:6px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:5px 10px;font-family:var(--f-display);font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 3px 0 var(--shadow);position:relative;animation:pop .2s ease-out}
+.bubble::after{content:"";position:absolute;left:50%;bottom:-6px;width:10px;height:10px;background:var(--card);border-right:1px solid var(--line);border-bottom:1px solid var(--line);transform:translateX(-50%) rotate(45deg)}
+.cloud{width:64px;height:52px;margin-bottom:-4px;animation:float 2.6s ease-in-out infinite}
+.extra{position:absolute;pointer-events:none}
+.puff{position:absolute;width:12px;height:12px;border-radius:50%;background:#F2F2F2;opacity:.9;animation:puff 1s ease-out infinite}
+.sweat{position:absolute;right:4px;top:4px;width:9px;height:13px;border-radius:50% 50% 50% 50%/62% 62% 38% 38%;background:#8EC0E4}
+.zz{position:absolute;right:-4px;top:-10px;font-family:var(--f-display);font-weight:700;font-size:14px;color:var(--muted);animation:float 2s ease-in-out infinite}
+.spark{position:absolute;width:10px;height:10px;background:#E2A93B;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:twinkle .9s ease-in-out infinite}
+.name-tag{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:2px;font-size:10.5px;font-weight:700;font-family:var(--f-display);color:var(--muted);white-space:nowrap;pointer-events:none}
+
+@keyframes bob{0%,100%{transform:translateY(0) scale(1,1)}50%{transform:translateY(-4px) scale(.96,1.04)}}
+@keyframes hop{0%,100%{transform:translateY(0) scale(1.04,.96)}50%{transform:translateY(-9px) scale(.95,1.05)}}
+@keyframes squish{0%,100%{transform:scale(1,1)}50%{transform:scale(1.07,.93)}}
+@keyframes shake{0%{transform:translateX(-2px)}50%{transform:translateX(2px)}100%{transform:translateX(-2px)}}
+@keyframes jump{0%{transform:translateY(0) scale(1.1,.9)}40%{transform:translateY(-28px) scale(.9,1.1)}100%{transform:translateY(0)}}
+@keyframes nod{0%,100%{transform:translateY(0) scale(1,1)}50%{transform:translateY(3px) scale(1.06,.94)}}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+@keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes puff{0%{transform:translate(0,0) scale(.6);opacity:.9}100%{transform:translate(var(--dx,0),-26px) scale(1.5);opacity:0}}
+@keyframes twinkle{0%,100%{transform:scale(.5);opacity:.4}50%{transform:scale(1.1);opacity:1}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(194,80,46,.55)}50%{box-shadow:0 0 0 8px rgba(194,80,46,0)}}
+@keyframes steam{0%{opacity:0;transform:translateY(0)}35%{opacity:.8}100%{opacity:0;transform:translateY(-20px) scaleX(1.6)}}
+
+/* side panel */
+aside.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px}
+.card ol,.card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.bell li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;font-size:13.5px;line-height:1.45}
+.bell li small{color:var(--muted);font-size:12px}
+.detail-head{display:flex;align-items:center;gap:12px}
+.detail-head .mini{width:56px;height:50px;flex:none}
+.detail-head b{font-family:var(--f-display);font-size:18px;display:block}
+.detail-head span{font-size:13px;color:var(--muted)}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+.pill.bad{background:color-mix(in srgb, var(--alert) 14%, var(--card));border-color:color-mix(in srgb, var(--alert) 40%, var(--line));color:var(--fg)}
+.pill.good{background:color-mix(in srgb, var(--ok) 16%, var(--card));border-color:color-mix(in srgb, var(--ok) 40%, var(--line))}
+.lbl{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+.cards li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;line-height:1.45}
+.cards li::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--d,#B9AC9A)}
+.cards li .c-body{display:grid;gap:4px;flex:1;min-width:0}
+.cards li .c-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.cards li .c-meta a{color:var(--fg);font-weight:700}
+.cards li.review{background:color-mix(in srgb, var(--bell) 12%, transparent);border-radius:8px;padding:6px 8px;margin:-2px -8px}
+.mini-btn{font:inherit;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:3px 10px;cursor:pointer}
+.mini-btn.ok{border-color:color-mix(in srgb, var(--ok) 60%, var(--line));background:color-mix(in srgb, var(--ok) 18%, var(--card))}
+.mini-btn:disabled{opacity:.5;cursor:default}
+.add-task{display:flex;gap:6px;margin-top:4px}
+.add-task input{flex:1;min-width:0;font:inherit;font-size:13px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+.done-list li{font-size:13px;line-height:1.45;display:grid;gap:2px;padding:6px 0;border-top:1px solid var(--line)}
+.done-list li small{color:var(--muted)}
+.rt-form{display:grid;gap:6px}
+.rt-form input,.rt-form select{font:inherit;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);min-width:0}
+.rt-row{display:flex;flex-wrap:wrap;gap:6px}
+.cast li{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px}
+.cast li i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.cast li em{font-style:normal;color:var(--muted);font-size:12px}
+.hint{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0}
+/* villa desk: calendar per unit, check-in / check-out, payouts */
+.layout > .villa{grid-column:1;grid-row:2}
+.layout > aside.side{grid-column:2;grid-row:1 / span 2}
+@media (max-width:1020px){.layout > .villa, .layout > aside.side{grid-column:auto;grid-row:auto}.layout > .villa{order:3}}
+.villa{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.villa h2{margin:0;font-family:var(--f-display);font-weight:700;font-size:18px}
+.villa .sub{color:var(--muted);font-size:12.5px}
+.v-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.v-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.v-box h3{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
+.v-box ul{margin:0;padding:0;list-style:none;display:grid;gap:5px;font-size:13.5px;line-height:1.4}
+.v-box li small{color:var(--muted)}
+.v-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.v-tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.v-tile b{display:block;font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.v-tile span{font-size:12px;color:var(--muted)}
+.cal-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.cal{display:grid;font-size:11.5px;min-width:max-content;position:relative}
+.cal .h{padding:4px 0;text-align:center;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.2}
+.cal .h.we{background:color-mix(in srgb, var(--line) 35%, transparent)}
+.cal .h.today{color:var(--fg);font-weight:700;background:color-mix(in srgb, var(--bell) 22%, transparent)}
+.cal .u{position:sticky;left:0;z-index:2;background:var(--card);padding:0 10px;display:flex;align-items:center;font-weight:700;font-family:var(--f-display);border-right:1px solid var(--line);white-space:nowrap}
+.cal .cell{border-left:1px solid color-mix(in srgb, var(--line) 50%, transparent);height:34px}
+.cal .cell.today{background:color-mix(in srgb, var(--bell) 12%, transparent)}
+.cal .bar{z-index:1;margin:5px 2px;border-radius:7px;padding:0 7px;display:flex;align-items:center;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:color-mix(in srgb, var(--ok) 30%, var(--card));border:1px solid color-mix(in srgb, var(--ok) 60%, var(--line));color:var(--fg)}
+.cal .bar.past{opacity:.55}
+.v-bars{display:grid;gap:4px;font-size:12px}
+.v-bars div{display:grid;grid-template-columns:62px minmax(0,1fr) 92px;gap:8px;align-items:center}
+.v-bars i{display:block;height:12px;border-radius:0 4px 4px 0;background:var(--sage-dark);min-width:2px}
+.v-bars em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+.v-bars span{color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.stage *, .side *{animation:none !important;transition:none !important}}
+</style>
+<style>html{color-scheme:light dark}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Kantor Mochi</h1>
+      <p id="subtitle">Tim Claude untuk usaha Kevin · klik mochi untuk mencolek, klik meja untuk melihat kartunya</p>
+    </div>
+    <span style="display:flex;gap:8px;flex-wrap:wrap"><a class="chip" href="https://likuloka.com/admin/" style="text-decoration:none">Dashboard</a><span class="chip" id="source-chip">Data contoh 5 Nov 2026</span></span>
+  </header>
+
+  <div class="layout">
+    <div class="stage-box" id="stage-box">
+      <div class="stage" id="stage" aria-label="Denah kantor">
+        <div class="zone wall">
+          <div class="window" style="left:150px"></div>
+          <div class="window" style="left:330px"></div>
+          <div class="window" style="left:720px"></div>
+          <div class="window" style="left:900px"></div>
+          <div class="plant" style="left:40px;top:28px"></div>
+          <div class="plant" style="left:1100px;top:28px"></div>
+        </div>
+        <div class="lantern" style="left:580px;top:40px"></div>
+
+        <div class="walk" style="left:86px;top:126px;width:1028px;height:50px"></div>
+        <div class="walk" style="left:86px;top:360px;width:1028px;height:50px"></div>
+        <div class="walk" style="left:86px;top:586px;width:1028px;height:50px"></div>
+        <div class="walk" style="left:86px;top:126px;width:50px;height:510px"></div>
+        <div class="walk" style="left:1064px;top:126px;width:50px;height:510px"></div>
+        <div class="walk" style="left:575px;top:126px;width:50px;height:510px"></div>
+
+        <div class="screen" style="left:335px;top:205px"></div>
+        <div class="screen" style="left:855px;top:205px"></div>
+        <div class="screen" style="left:335px;top:435px"></div>
+        <div class="screen" style="left:855px;top:435px"></div>
+        <div class="plant" style="left:520px;top:218px"></div>
+        <div class="plant" style="left:640px;top:450px"></div>
+
+        <div class="zone canteen" aria-label="Kantin">
+          <span class="zone-label" style="left:18px;top:12px">KANTIN</span>
+          <div class="noren" style="left:440px;top:0"><span></span><span>茶</span><span></span></div>
+          <div class="counter" style="left:60px;top:88px;width:170px"></div>
+          <div class="machine" style="left:120px;top:16px"></div>
+          <span class="steam" style="left:144px;top:26px"></span>
+          <span class="steam" style="left:154px;top:26px;animation-delay:.8s"></span>
+          <div class="table-low" style="left:290px;top:78px"></div>
+          <div class="cushion" style="left:282px;top:104px"></div>
+          <div class="cushion" style="left:404px;top:104px"></div>
+        </div>
+        <div class="zone garden" aria-label="Taman batu">
+          <span class="zone-label" style="left:18px;top:12px">TAMAN BATU</span>
+          <div class="stone" style="left:100px;top:56px;width:40px;height:28px"></div>
+          <div class="stone" style="left:150px;top:74px;width:22px;height:16px"></div>
+          <div class="stone" style="left:420px;top:40px;width:30px;height:22px"></div>
+          <div class="bench" style="left:220px;top:88px"></div>
+          <div class="plant" style="left:470px;top:56px"></div>
+        </div>
+
+        <div id="desks"></div>
+        <div id="mochis"></div>
+      </div>
+    </div>
+
+    <section class="villa" id="villa-cal" hidden aria-labelledby="villa-h">
+      <div><h2 id="villa-h">Villa Kahuna · kalender &amp; pemasukan</h2><div class="sub" id="v-sub"></div></div>
+      <div class="v-grid2" id="v-moves"></div>
+      <div class="cal-scroll"><div class="cal" id="v-cal" role="table" aria-label="Kalender booking per villa"></div></div>
+      <div class="v-grid2" id="v-avail" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))"></div>
+      <div class="v-tiles" id="v-tiles"></div>
+      <div class="v-grid2"><div class="v-box"><h3>Pencairan per minggu (12 minggu)</h3><div class="v-bars" id="v-weeks"></div></div>
+        <div class="v-box"><h3>Pencairan harian &amp; yang akan masuk</h3><ul id="v-days"></ul></div></div>
+      <p class="hint">Sumber: email Bukit Vista (booking dan payout) yang dibaca rutinitas Claude setiap hari.</p>
+    </section>
+
+    <aside class="side">
+      <section class="card bell" aria-labelledby="bell-h">
+        <h2 id="bell-h"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color:var(--bell)"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Bel untuk Kevin</h2>
+        <ol id="bell-list"></ol>
+      </section>
+
+      <section class="card" aria-live="polite" id="detail">
+        <div class="detail-head">
+          <svg class="mini" id="detail-mini" viewBox="0 -6 100 96" aria-hidden="true"></svg>
+          <div><b id="d-name">Pilih meja</b><span id="d-role">Klik meja di denah</span></div>
+        </div>
+        <div class="pills" id="d-pills"></div>
+        <div class="lbl">Kartu di meja</div>
+        <ul class="cards" id="d-cards"></ul>
+        <form class="add-task" id="add-task"><input id="add-text" maxlength="300" placeholder="Tambah tugas ke meja ini…" aria-label="Tugas baru"><button class="mini-btn" type="submit">Tambah</button></form>
+        <div class="lbl">Menunggu</div>
+        <p class="hint" id="d-wait" style="color:var(--fg)">—</p>
+      </section>
+
+      <section class="card" aria-labelledby="rt-h">
+        <h2 id="rt-h">Rutinitas</h2>
+        <ul class="done-list" id="rt-list"></ul>
+        <form class="rt-form" id="rt-form">
+          <input id="rt-text" maxlength="300" placeholder="Rutinitas baru, mis. Cek pencairan Booking.com" aria-label="Rutinitas baru">
+          <div class="rt-row"><select id="rt-desk" aria-label="Meja"></select>
+            <select id="rt-every" aria-label="Seberapa sering"><option value="daily">Setiap hari</option><option value="weekly" selected>Setiap minggu</option><option value="monthly">Setiap bulan</option></select>
+            <select id="rt-day" aria-label="Hari / tanggal"></select>
+            <button class="mini-btn" type="submit">Tambah</button></div>
+        </form>
+        <p class="hint">Saat jatuh tempo, rutinitas muncul sebagai kartu di mejanya dan tetap di sana sampai di-approve.</p>
+      </section>
+
+      <section class="card" aria-labelledby="done-h">
+        <h2 id="done-h">Sudah di-approve Kevin</h2>
+        <ul class="done-list" id="done-list"></ul>
+        <p class="hint">Tekan <b>✓ Approve</b> di kartu yang sudah selesai dan sudah dicek. Kartu hilang dari meja, tercatat di sini, dan rutinitas Ops menutupnya.</p>
+      </section>
+
+      <section class="card" aria-labelledby="cast-h">
+        <h2 id="cast-h">Sifat para mochi</h2>
+        <ul class="cast" id="cast"></ul>
+        <p class="hint">Colek tiga kali berturut-turut untuk reaksi yang lebih kuat. Mochi tanpa tugas berjalan-jalan di koridor, mampir ke kantin atau taman batu.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- data (used when /api/status is not available) ---------- */
+const SAMPLE = {
+  asOf: '2026-11-05',
+  bell: [
+    { text: 'Tanyakan ke Bukit Vista: pencairan Sam Lyall kurang Rp 1.440.072 dan 3 unit tercatat ganda', from: 'Villa & Kahuna' },
+    { text: 'Cek API key Claude di website likuloka.com (laporan 30 Okt error 403)', from: 'Konstruksi' },
+    { text: 'Ganti connector Cloudflare ke versi baru', from: 'Chief' },
+  ],
+  desks: [
+    { id:'chief', name:'Chief', role:'Membagi kerja, tidak mengerjakan', color:'#D9D2F0', trait:'penurut', model:'Sonnet', state:'kerja', waiting:'Kevin',
+      cards:[{ text:'Minta Kevin mengganti connector Cloudflare ke versi baru', tone:'kevin' }] },
+    { id:'ops', name:'Ops', role:'Papan tugas dan laporan pagi', color:'#CFE8DA', trait:'datar', model:'Haiku', state:'kerja', waiting:'Persetujuan pemasangan rutinitas pagi',
+      cards:[{ text:'Laporan pagi otomatis belum dipasang', tone:'todo' }] },
+    { id:'konstruksi', name:'Konstruksi', role:'Proyek Liku Loka dan Afrodite', color:'#F6D2BC', trait:'pemarah', model:'Sonnet', state:'macet', waiting:'Supervisor Lusso 1 dan Kevin',
+      cards:[{ text:'Villa Lusso 1 belum mengirim laporan lapangan sejak 29 Okt', tone:'macet' },{ text:'Laporan Lusso 2 tanggal 30 Okt gagal dianalisis (error 403)', tone:'macet' },{ text:'Fit-out Afrodite mulai 9 Nov', tone:'todo' }] },
+    { id:'villa', name:'Villa & Kahuna', role:'Villa, OTA, Kahuna Cafe', color:'#F2CFD6', trait:'pemalu', model:'Haiku, naik ke Sonnet untuk selisih', state:'macet', waiting:'Jawaban Bukit Vista',
+      cards:[{ text:'Pencairan Sam Lyall kurang Rp 1.440.072 (79,8%, seharusnya 85%)', tone:'macet' },{ text:'3 unit tercatat ganda di email booking Oktober', tone:'macet' },{ text:'Cek pencairan Booking.com tamu Oktober setelah 15 Nov', tone:'todo' }] },
+    { id:'checker', name:'Checker', role:'Cek bukti sebelum Done', color:'#F3E6B3', trait:'perfeksionis', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
+    { id:'kerapu', name:'Kerapu', role:'Budidaya kerapu Bali Utara', color:'#CDE3F2', trait:'ngantuk', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
+    { id:'misc', name:'Misc', role:'Barbershop, perjalanan, lain-lain', color:'#DDE0D2', trait:'penakut', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
+    { id:'lika', name:'Konten Lika', role:'Naskah dan prompt konten', color:'#EBD3EE', trait:'ceria', model:'Sonnet', state:'belum', waiting:'Meja lain berjalan dulu', cards:[] },
+  ],
+};
+
+const TRAITS = {
+  penurut:     { label:'Penurut',     base:'happy',  lines:['Siap, Bos!','Laksanakan!','Ada tugas baru?','Siap 100%!'], fx:'nod', big:'jump', bigLine:'Siap! Siap! Siap!' },
+  datar:       { label:'Datar',       base:'flat',   lines:['Oke.','...','Ada apa.','Hm.'], fx:null, big:null, bigLine:'...makasih.' },
+  pemarah:     { label:'Pemarah',     base:'normal', lines:['Jangan ganggu!','Hmph!','Lagi sibuk, tahu!','Apa sih?!'], fx:'shake', big:'shake', bigLine:'SUDAH KUBILANG JANGAN GANGGU!' },
+  pemalu:      { label:'Pemalu',      base:'normal', lines:['E-eh...','J-jangan lihat...','Malu...','A-ada apa?'], fx:null, big:'hide', bigLine:'(sembunyi)' },
+  perfeksionis:{ label:'Perfeksionis',base:'sus',    lines:['Mana buktinya?','Sudah dicek dua kali?','Hmm...','Datanya dari mana?'], fx:null, big:'nod', bigLine:'Baik, nanti kucek.' },
+  ngantuk:     { label:'Ngantuk',     base:'sleepy', lines:['Hoaaam...','Ikan aman kok...','Lima menit lagi...','Zzz... eh?'], fx:'jump', big:'spin', bigLine:'Iya, iya, bangun!' },
+  penakut:     { label:'Penakut',     base:'normal', lines:['Hiii!','Ka-kaget!','Jangan kagetin!','Ada apa?!'], fx:'jump', big:'flee', bigLine:'TOLOOONG!' },
+  ceria:       { label:'Ceria',       base:'happy',  lines:['Yay!','Foto dulu!','Ayo bikin konten!','Hai hai!'], fx:'jump', big:'spin', bigLine:'Kapan aku mulai kerja?' },
+};
+const REACT_EXPR = { penurut:'happy', datar:'flat', pemarah:'angry', pemalu:'shy', perfeksionis:'sus', ngantuk:'scared', penakut:'scared', ceria:'star' };
+
+/* ---------- faces ---------- */
+const FACES = {
+  normal:'<ellipse cx="38" cy="50" rx="3.6" ry="5"/><ellipse cx="62" cy="50" rx="3.6" ry="5"/><path class="ln" d="M45 61 Q50 65 55 61"/>',
+  happy:'<path class="ln" d="M32 51 Q38 44 44 51"/><path class="ln" d="M56 51 Q62 44 68 51"/><path class="mouth" d="M43 59 Q50 69 57 59 Z"/>',
+  sad:'<path class="ln" d="M31 42 L42 46"/><path class="ln" d="M69 42 L58 46"/><ellipse cx="38" cy="52" rx="3.2" ry="4.4"/><ellipse cx="62" cy="52" rx="3.2" ry="4.4"/><path class="ln" d="M44 66 Q50 60 56 66"/><ellipse class="tear" cx="35" cy="61" rx="2.4" ry="3.8"/>',
+  angry:'<path class="ln thick" d="M30 41 L44 47"/><path class="ln thick" d="M70 41 L56 47"/><ellipse cx="39" cy="53" rx="3" ry="3.4"/><ellipse cx="61" cy="53" rx="3" ry="3.4"/><path class="ln" d="M43 66 Q50 60 57 66"/>',
+  shy:'<path class="ln" d="M34 46 L41 50 L34 54"/><path class="ln" d="M66 46 L59 50 L66 54"/><path class="ln" d="M44 62 q3 -3 6 0 q3 3 6 0"/>',
+  scared:'<circle class="white" cx="38" cy="49" r="6.5"/><circle class="white" cx="62" cy="49" r="6.5"/><circle cx="38" cy="49" r="1.8"/><circle cx="62" cy="49" r="1.8"/><ellipse class="ln" cx="50" cy="64" rx="3" ry="4"/>',
+  flat:'<path class="ln" d="M33 50 L43 50"/><path class="ln" d="M57 50 L67 50"/><path class="ln" d="M45 61 L55 61"/>',
+  sleepy:'<path class="ln" d="M32 50 Q38 55 44 50"/><path class="ln" d="M56 50 Q62 55 68 50"/><ellipse class="ln" cx="50" cy="62" rx="2.2" ry="2.6"/>',
+  star:'<path class="star" d="M38 42 L40.5 48 L47 50 L40.5 52 L38 58 L35.5 52 L29 50 L35.5 48 Z"/><path class="star" d="M62 42 L64.5 48 L71 50 L64.5 52 L62 58 L59.5 52 L53 50 L59.5 48 Z"/><path class="mouth" d="M43 60 Q50 70 57 60 Z"/>',
+  sus:'<path class="ln" d="M31 44 L44 41"/><path class="ln" d="M33 51 L43 51"/><ellipse cx="62" cy="50" rx="3.6" ry="5"/><path class="ln" d="M45 63 L55 60"/>',
+  worried:'<path class="ln" d="M31 43 Q37 39 43 43"/><path class="ln" d="M69 43 Q63 39 57 43"/><ellipse cx="38" cy="51" rx="3.4" ry="4.6"/><ellipse cx="62" cy="51" rx="3.4" ry="4.6"/><path class="ln" d="M45 63 Q50 60 55 63"/>',
+};
+const BODY = 'M8 78 C2 56 12 16 50 12 C88 16 98 56 92 78 C88 88 12 88 8 78 Z';
+function slimeSVG(color, expr){
+  return `<ellipse cx="50" cy="86" rx="36" ry="5" fill="rgba(0,0,0,.13)"/>
+  <path d="${BODY}" fill="${color}"/>
+  <path d="${BODY}" fill="#D9573A" class="tint"/>
+  <path d="M12 74 C20 84 80 84 88 74 C88 82 80 86 50 86 C20 86 12 82 12 74 Z" fill="rgba(0,0,0,.07)"/>
+  <ellipse cx="31" cy="31" rx="9" ry="5" fill="rgba(255,255,255,.82)" transform="rotate(-25 31 31)"/>
+  <g class="blushes"><ellipse class="blush" cx="29" cy="59" rx="5.5" ry="2.8"/><ellipse class="blush" cx="71" cy="59" rx="5.5" ry="2.8"/></g>
+  <g class="face">${FACES[expr] || FACES.normal}</g>`;
+}
+
+/* ---------- floor graph ---------- */
+const DESK_X = [250, 430, 770, 950];
+const N = {};
+const addN = (id, x, y) => { N[id] = { id, x, y, adj: new Set() }; };
+const link = (a, b) => { N[a].adj.add(b); N[b].adj.add(a); };
+const ys = { T:151, M:385, B:611 };
+const xs = [111, 250, 430, 600, 770, 950, 1089];
+for (const r of ['T','M','B']) { xs.forEach((x, i) => addN(r + i, x, ys[r])); for (let i = 0; i < xs.length - 1; i++) link(r + i, r + (i + 1)); }
+for (const c of [0, 3, 6]) { link('T' + c, 'M' + c); link('M' + c, 'B' + c); }
+addN('K0', 300, 700); addN('K1', 175, 708); addN('K2', 365, 735); addN('K3', 470, 740);
+link('B1', 'K0'); link('K0', 'K1'); link('K0', 'K2'); link('K2', 'K3'); link('B2', 'K3');
+addN('G0', 770, 700); addN('G1', 890, 718); addN('G2', 1010, 702); addN('G3', 700, 742);
+link('B4', 'G0'); link('G0', 'G1'); link('G1', 'G2'); link('G0', 'G3'); link('B5', 'G1');
+const WANDER = ['T0','T2','T3','T5','T6','M0','M3','M6','B0','B3','B6','K1','K2','K3','G1','G2','G3','K0','G0'];
+const REST = ['K1','K2','K3','G1','G2','G3'];
+
+const SLOTS = [ // desk centre (x, top y) and the corridor node each seat joins
+  { x:DESK_X[0], y:262, row:'T', col:1 }, { x:DESK_X[1], y:262, row:'T', col:2 },
+  { x:DESK_X[2], y:262, row:'T', col:4 }, { x:DESK_X[3], y:262, row:'T', col:5 },
+  { x:DESK_X[0], y:492, row:'M', col:1 }, { x:DESK_X[1], y:492, row:'M', col:2 },
+  { x:DESK_X[2], y:492, row:'M', col:4 }, { x:DESK_X[3], y:492, row:'M', col:5 },
+];
+
+function path(from, to){
+  if (from === to) return [to];
+  const prev = { [from]: null }, q = [from];
+  while (q.length){
+    const n = q.shift();
+    if (n === to) break;
+    for (const m of N[n].adj) if (!(m in prev)) { prev[m] = n; q.push(m); }
+  }
+  if (!(to in prev)) return [to];
+  const out = []; for (let n = to; n; n = prev[n]) out.unshift(n);
+  return out;
+}
+function nearest(x, y){
+  let best = null, d = Infinity;
+  for (const id in N){ const n = N[id]; const dd = (n.x - x) ** 2 + (n.y - y) ** 2; if (dd < d){ d = dd; best = id; } }
+  return best;
+}
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+/* ---------- build ---------- */
+const stage = document.getElementById('stage');
+const box = document.getElementById('stage-box');
+const deskLayer = document.getElementById('desks');
+const mochiLayer = document.getElementById('mochis');
+let data = SAMPLE, mochis = [], selected = 'villa';
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function fit(){
+  const s = box.clientWidth / 1200;
+  stage.style.transform = `scale(${s})`;
+  box.style.height = (780 * s) + 'px';
+}
+new ResizeObserver(fit).observe(box);
+
+function el(tag, cls, html){ const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+function txt(tag, cls, t){ const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = t; return e; }
+
+function build(){
+  deskLayer.replaceChildren(); mochiLayer.replaceChildren(); mochis = [];
+  data.desks.forEach((d, i) => {
+    const slot = SLOTS[i]; if (!slot) return;
+    d.slot = slot;
+    const seatId = 'S_' + d.id;
+    addN(seatId, slot.x, slot.y + 6);
+    link(seatId, slot.row + slot.col);
+    d.seat = seatId;
+
+    const b = el('button', 'desk' + (d.state === 'belum' ? ' empty' : ''));
+    b.type = 'button';
+    b.style.left = (slot.x - 59) + 'px';
+    b.style.top = slot.y + 'px';
+    b.style.zIndex = Math.round(slot.y + 30);
+    b.style.setProperty('--dot', d.color);
+    b.setAttribute('aria-label', `Meja ${d.name}. Lihat kartu`);
+    const top = el('div', 'top');
+    if (d.state !== 'belum'){
+      top.appendChild(el('div', 'mon'));
+      const lamp = el('div', 'lamp' + (d.state === 'macet' ? ' red' : '')); top.appendChild(lamp);
+      const st = el('div', 'stack'); (d.cards || []).forEach(() => st.appendChild(el('i'))); top.appendChild(st);
+      top.appendChild(el('div', 'cup'));
+    }
+    b.appendChild(top);
+    const plate = el('div', 'plate');
+    plate.appendChild(txt('b', '', d.name));
+    plate.appendChild(txt('small', '', statusLine(d)));
+    b.appendChild(plate);
+    b.addEventListener('click', () => select(d.id));
+    d.deskEl = b;
+    deskLayer.appendChild(b);
+
+    if (d.state !== 'belum' || d.trait === 'ceria') makeMochi(d);
+  });
+  renderSide();
+  select(selected);
+}
+function statusLine(d){
+  if (d.state === 'macet') return d.cards.filter(c => c.tone === 'macet').length + ' kartu macet';
+  if (d.state === 'santai') return 'Jalan-jalan';
+  if (d.state === 'belum') return 'Segera dipasang';
+  return d.cards.length ? d.cards.length + ' kartu' : 'Siap';
+}
+
+function makeMochi(d){
+  const m = { d, x:0, y:0, route:[], speed:62, pause:0, react:0, pokes:[], expr:'normal', flip:false, mode:'' };
+  const btn = el('button', 'mochi');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', `Colek ${d.name}`);
+  const body = el('div', 'body');
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg'); svg.setAttribute('viewBox', '0 -6 100 96');
+  body.appendChild(svg);
+  const fx = el('div', 'fx');
+  btn.append(body, fx, txt('span', 'name-tag', d.name));
+  btn.addEventListener('click', (e) => { e.stopPropagation(); poke(m); });
+  m.el = btn; m.svg = svg; m.fx = fx; m.body = body;
+  mochiLayer.appendChild(btn);
+
+  const roams = d.state === 'santai' || d.state === 'belum';
+  const start = roams ? N[pick(REST)] : N[d.seat];
+  m.x = start.x; m.y = start.y;
+  m.home = roams ? null : d.seat;
+  m.coffeeAt = performance.now() + 25000 + Math.random() * 50000;
+  m.pause = performance.now() + Math.random() * 2500;
+  setExpr(m, baseExpr(m));
+  mochis.push(m);
+  place(m);
+}
+
+function atSeat(m){ return m.home && m.route.length === 0 && Math.hypot(m.x - N[m.home].x, m.y - N[m.home].y) < 2; }
+function baseExpr(m){
+  const t = m.d.trait;
+  if (atSeat(m) && m.d.state === 'macet') return t === 'pemarah' ? 'angry' : 'sad';
+  if (m.route.length) return t === 'datar' ? 'flat' : t === 'ngantuk' ? 'sleepy' : 'happy';
+  return TRAITS[t].base;
+}
+function setExpr(m, expr){
+  if (m.expr === expr && m.svg.childNodes.length) return;
+  m.expr = expr;
+  m.svg.innerHTML = slimeSVG(m.d.color, expr);
+  m.el.classList.toggle('shy', expr === 'shy');
+  m.el.classList.toggle('angry', expr === 'angry');
+}
+function setMode(m, mode){
+  if (m.mode === mode) return;
+  m.el.classList.remove('walking','working','idle','stuck'); if (mode) m.el.classList.add(mode); m.mode = mode;
+}
+function place(m){
+  m.el.style.transform = `translate(${m.x - 38}px, ${m.y - 64}px)`;
+  m.el.style.zIndex = Math.round(m.y);
+  m.el.classList.toggle('flip', m.flip);
+}
+
+/* thought cloud / ambient fx */
+function ambient(m){
+  if (m.react) return;
+  const stuck = atSeat(m) && m.d.state === 'macet';
+  const want = stuck ? (m.d.trait === 'pemarah' ? 'marah' : 'sedih') : (m.d.trait === 'ngantuk' && !m.route.length ? 'zz' : '');
+  if (m.fxKind === want) return;
+  m.fxKind = want;
+  m.fx.replaceChildren();
+  m.el.querySelectorAll('.extra').forEach(e => e.remove());
+  if (want === 'marah' || want === 'sedih') m.fx.appendChild(cloud(want));
+  if (want === 'zz') { const z = txt('span', 'zz extra', 'z z'); m.el.appendChild(z); }
+}
+function cloud(kind){
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 64 52'); s.setAttribute('class', 'cloud'); s.setAttribute('aria-hidden', 'true');
+  const inner = kind === 'marah'
+    ? '<g transform="translate(32 21)" stroke="#C2502E" stroke-width="3.2" fill="none" stroke-linecap="round"><path d="M-9 -3 Q-3 -3 -3 -9"/><path d="M9 -3 Q3 -3 3 -9"/><path d="M-9 3 Q-3 3 -3 9"/><path d="M9 3 Q3 3 3 9"/></g>'
+    : '<g transform="translate(32 18)"><path d="M-10 4 a6 6 0 0 1 2 -11 a8 8 0 0 1 15 2 a5 5 0 0 1 3 9 Z" fill="#9AA7B4"/><path d="M-5 8 l-2 5 M1 8 l-2 5 M7 8 l-2 5" stroke="#6FA8D6" stroke-width="2.4" stroke-linecap="round"/></g>';
+  s.innerHTML = `<path d="M14 36 a10 10 0 0 1 2 -19 a13 13 0 0 1 24 -6 a11 11 0 0 1 17 9 a9 9 0 0 1 -3 16 Z" fill="#FFFFFF" stroke="#D9CFC1" stroke-width="1.5"/>
+    <circle cx="22" cy="43" r="4" fill="#FFFFFF" stroke="#D9CFC1" stroke-width="1.5"/><circle cx="28" cy="50" r="2.2" fill="#FFFFFF" stroke="#D9CFC1" stroke-width="1.2"/>${inner}`;
+  return s;
+}
+
+/* ---------- poke ---------- */
+function poke(m){
+  const now = performance.now();
+  m.pokes = m.pokes.filter(t => now - t < 6000); m.pokes.push(now);
+  const T = TRAITS[m.d.trait];
+  const n = m.pokes.length;
+  const big = (m.d.trait === 'datar' ? n >= 5 : n >= 3);
+  let line = big ? T.bigLine : T.lines[(n - 1) % T.lines.length];
+  if (m.d.state === 'macet' && !big && n === 1){
+    line = m.d.trait === 'pemarah' ? 'Lusso 1 belum lapor!' : m.d.trait === 'pemalu' ? 'U-uangnya kurang...' : line;
+  }
+  let expr = REACT_EXPR[m.d.trait];
+  if (m.d.trait === 'datar' && big) expr = 'happy';
+  if (m.d.trait === 'perfeksionis' && big) expr = 'normal';
+  if (m.d.trait === 'ngantuk' && big) expr = 'happy';
+  setExpr(m, expr);
+
+  m.fxKind = 'react';
+  m.fx.replaceChildren(txt('div', 'bubble', line));
+  m.el.querySelectorAll('.extra').forEach(e => e.remove());
+  ['r-shake','r-jump','r-nod','r-hide','r-spin'].forEach(c => m.el.classList.remove(c));
+  void m.el.offsetWidth;
+  const move = big ? T.big : T.fx;
+  if (move === 'flee'){
+    m.el.classList.add('r-jump');
+    const far = WANDER.slice().sort((a, b) => Math.hypot(N[b].x - m.x, N[b].y - m.y) - Math.hypot(N[a].x - m.x, N[a].y - m.y))[0];
+    m.route = path(nearest(m.x, m.y), far); m.speed = 170; m.fleeing = true;
+    addExtra(m, 'sweat');
+  } else if (move) m.el.classList.add('r-' + move);
+  if (m.d.trait === 'pemarah' && big){ for (let i = 0; i < 3; i++){ const p = el('span', 'puff extra'); p.style.left = (14 + i * 22) + 'px'; p.style.top = '-6px'; p.style.setProperty('--dx', (i - 1) * 10 + 'px'); p.style.animationDelay = (i * .25) + 's'; m.el.appendChild(p); } }
+  if (m.d.trait === 'penakut' && !big) addExtra(m, 'sweat');
+  if (m.d.trait === 'ceria'){ [[-6,6],[70,0],[34,-14]].forEach(([x,y], i) => { const s = el('span', 'spark extra'); s.style.left = x + 'px'; s.style.top = y + 'px'; s.style.animationDelay = (i * .2) + 's'; m.el.appendChild(s); }); }
+  m.react = now + (big ? 3000 : 2200);
+  if (!m.fleeing) { m.pause = Math.max(m.pause, m.react + 600); }
+}
+function addExtra(m, cls){ const e = el('span', cls + ' extra'); m.el.appendChild(e); }
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function tick(now){
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  for (const m of mochis){
+    if (m.react && now > m.react){
+      m.react = 0; m.fxKind = null; m.fx.replaceChildren();
+      m.el.querySelectorAll('.extra').forEach(e => e.remove());
+      ['r-shake','r-jump','r-nod','r-hide','r-spin'].forEach(c => m.el.classList.remove(c));
+    }
+    const moving = m.route.length > 0 && (!m.react || m.fleeing);
+    if (moving){
+      const t = N[m.route[0]];
+      const dx = t.x - m.x, dy = t.y - m.y, dist = Math.hypot(dx, dy);
+      const step = m.speed * dt * (reduce ? 3 : 1);
+      if (Math.abs(dx) > 1) m.flip = dx < 0;
+      if (dist <= step){ m.x = t.x; m.y = t.y; m.route.shift(); }
+      else { m.x += dx / dist * step; m.y += dy / dist * step; }
+      if (!m.route.length){
+        m.speed = 62;
+        if (m.fleeing){ m.fleeing = false; }
+        m.pause = now + (m.home && m.goingHome ? 0 : 2500 + Math.random() * 5000);
+        if (m.goingHome) { m.goingHome = false; m.flip = false; }
+        if (m.coffeeRun){ m.coffeeRun = false; m.goingHome = true; m.pause = now + 3500; m.backHome = true; }
+      }
+    } else if (!m.react && now > m.pause){
+      if (!m.home){
+        const here = nearest(m.x, m.y);
+        let dest = pick(WANDER); if (dest === here) dest = pick(REST);
+        m.route = path(here, dest);
+      } else if (m.backHome){
+        m.backHome = false; m.route = path(nearest(m.x, m.y), m.home); m.goingHome = true;
+      } else if (atSeat(m) && m.d.state === 'kerja' && now > m.coffeeAt){
+        m.coffeeAt = now + 60000 + Math.random() * 60000;
+        m.coffeeRun = true; m.route = path(m.home, 'K1');
+      } else if (!atSeat(m) && !m.route.length){
+        m.route = path(nearest(m.x, m.y), m.home); m.goingHome = true;
+      }
+    }
+    if (!m.react) setExpr(m, baseExpr(m));
+    const mode = m.route.length && (!m.react || m.fleeing) ? 'walking'
+      : atSeat(m) ? (m.d.state === 'macet' ? 'stuck' : 'working') : 'idle';
+    setMode(m, mode);
+    ambient(m);
+    place(m);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- side panel ---------- */
+function renderSide(){
+  const bl = document.getElementById('bell-list'); bl.replaceChildren();
+  (data.bell || []).forEach(b => { const li = el('li'); li.appendChild(txt('span', '', b.text)); li.appendChild(txt('small', '', 'dari meja ' + b.from)); bl.appendChild(li); });
+  const dl = document.getElementById('done-list'); dl.replaceChildren();
+  if (!(data.done || []).length) dl.appendChild(txt('li', '', 'Belum ada.'));
+  (data.done || []).forEach(x => { const li = el('li'); li.appendChild(txt('span', '', x.text || x.id));
+    const sm = txt('small', '', `${(data.desks.find(d => d.id === x.desk) || {}).name || x.desk || ''} · ${new Date(x.at).toLocaleString('id-ID', { timeZone: 'Asia/Makassar', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} WITA `);
+    const undo = txt('button', 'mini-btn', 'Buka lagi'); undo.type = 'button'; undo.addEventListener('click', () => act({ action: 'reopen', id: x.id }, undo)); sm.appendChild(undo);
+    li.appendChild(sm); dl.appendChild(li); });
+  // Routines and the form to add one.
+  const WD = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  const rl = document.getElementById('rt-list'); rl.replaceChildren();
+  if (!(BOARD.routines || []).length) rl.appendChild(txt('li', '', 'Belum ada rutinitas.'));
+  (BOARD.routines || []).forEach(r => { const li = el('li'); li.appendChild(txt('span', '', r.text));
+    const when = r.every === 'daily' ? 'Setiap hari' : r.every === 'weekly' ? 'Setiap ' + WD[r.day] : 'Setiap tanggal ' + r.day;
+    const sm = txt('small', '', `${(data.desks.find(d => d.id === r.desk) || {}).name || r.desk} · ${when} `);
+    const del = txt('button', 'mini-btn', 'Hapus'); del.type = 'button';
+    del.addEventListener('click', () => { if (confirm('Hapus rutinitas ini?')) act({ action: 'delete_routine', id: r.id }, del); });
+    sm.appendChild(del); li.appendChild(sm); rl.appendChild(li); });
+  const ds = document.getElementById('rt-desk'), keep = ds.value;
+  ds.replaceChildren(...data.desks.map(d => { const o = txt('option', '', d.name); o.value = d.id; return o; }));
+  ds.value = keep || selected;
+  const cast = document.getElementById('cast'); cast.replaceChildren();
+  data.desks.forEach(d => { const li = el('li'); const i = el('i'); i.style.background = d.color; li.append(i, txt('span', '', d.name), txt('em', '', TRAITS[d.trait] ? TRAITS[d.trait].label : '')); cast.appendChild(li); });
+}
+/* ---------- board: Kevin's approvals, his own tasks and live cards from the website ---------- */
+let BOARD = { added: [], decisions: {} };
+const hash = s => { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.charCodeAt(0)) >>> 0; return h.toString(36); };
+const cardId = (desk, c) => c.id || 'c-' + hash(desk + '|' + c.text);
+function merge(base, board, live){
+  const dec = board.decisions || {};
+  const out = { ...base, desks: base.desks.map(d => {
+    const cards = (d.cards || []).map(c => ({ ...c, id: cardId(d.id, c) }))
+      .concat((board.added || []).filter(t => t.desk === d.id).map(t => ({ ...t, own: true })))
+      .filter(c => dec[c.id]?.status !== 'approved')
+      .map(c => (dec[c.id]?.status === 'review' ? { ...c, review: true } : c))
+      .concat((live && live[d.id]) || []);
+    const state = d.state === 'belum' && !cards.length ? 'belum' : cards.some(c => c.tone === 'macet') ? 'macet' : cards.length ? 'kerja' : 'santai';
+    return { ...d, cards, state, waiting: d.waiting || (cards.some(c => c.tone === 'kevin') ? 'Kevin' : 'Tidak ada') };
+  }) };
+  const bellLive = out.desks.flatMap(d => d.cards.filter(c => (c.live && c.tone === 'kevin') || c.review).map(c => ({ text: (c.review ? 'Approve: ' : '') + c.text, from: d.name })));
+  out.bell = (base.bell || []).concat(bellLive);
+  out.done = Object.entries(dec).filter(([, v]) => v.status === 'approved').map(([id, v]) => ({ id, ...v })).sort((a, b) => a.at < b.at ? 1 : -1).slice(0, 15);
+  return out;
+}
+async function act(body, btn){
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/card', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    await refresh();
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Gagal, coba lagi'; } }
+}
+const rtEvery = document.getElementById('rt-every'), rtDay = document.getElementById('rt-day');
+function rtDays(){
+  const w = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+  rtDay.hidden = rtEvery.value === 'daily';
+  rtDay.replaceChildren(...(rtEvery.value === 'weekly' ? w.map((n, i) => [i + 1, n]) : Array.from({ length: 31 }, (_, i) => [i + 1, 'Tanggal ' + (i + 1)]))
+    .map(([v, n]) => { const o = txt('option', '', n); o.value = v; return o; }));
+}
+rtEvery.addEventListener('change', rtDays); rtDays();
+document.getElementById('rt-form').addEventListener('submit', e => {
+  e.preventDefault(); const i = document.getElementById('rt-text'); const text = i.value.trim(); if (text.length < 3) return;
+  act({ action: 'add_routine', desk: document.getElementById('rt-desk').value, text, every: rtEvery.value, day: rtDay.value }).then(() => { i.value = ''; });
+});
+document.getElementById('add-task').addEventListener('submit', e => {
+  e.preventDefault(); const i = document.getElementById('add-text'); const text = i.value.trim(); if (text.length < 3) return;
+  act({ action: 'add', desk: selected, text }).then(() => { i.value = ''; });
+});
+
+function select(id){
+  selected = id;
+  const d = data.desks.find(x => x.id === id) || data.desks[0];
+  data.desks.forEach(x => x.deskEl && x.deskEl.classList.toggle('sel', x.id === d.id));
+  document.getElementById('d-name').textContent = d.name;
+  document.getElementById('d-role').textContent = d.role;
+  document.getElementById('detail-mini').innerHTML = slimeSVG(d.color, d.state === 'macet' ? (d.trait === 'pemarah' ? 'angry' : 'sad') : (TRAITS[d.trait] || TRAITS.penurut).base);
+  const pills = document.getElementById('d-pills'); pills.replaceChildren();
+  const st = { macet:['Ada yang macet','bad'], kerja:['Bekerja','good'], santai:['Jalan-jalan',''], belum:['Belum dipasang',''] }[d.state] || ['', ''];
+  pills.append(txt('span', 'pill ' + st[1], st[0]), txt('span', 'pill', TRAITS[d.trait] ? 'Sifat: ' + TRAITS[d.trait].label : ''), txt('span', 'pill', 'Model: ' + d.model));
+  const ul = document.getElementById('d-cards'); ul.replaceChildren();
+  const tone = { macet:'var(--alert)', todo:'#B9AC9A', kevin:'var(--bell)' };
+  if (!d.cards.length) ul.appendChild(txt('li', '', 'Tidak ada kartu.'));
+  d.cards.forEach(c => {
+    const li = el('li', c.review ? 'review' : ''); li.style.setProperty('--d', tone[c.tone] || '#B9AC9A');
+    const bodyEl = el('div', 'c-body'); bodyEl.appendChild(txt('span', '', c.text));
+    const meta = el('div', 'c-meta');
+    if (c.live) meta.appendChild(txt('span', '', 'otomatis dari website · hilang sendiri setelah beres'));
+    else if (c.own) meta.appendChild(txt('span', '', 'tugas dari Kevin'));
+    else if (c.routine) meta.appendChild(txt('span', '', 'rutinitas'));
+    if (c.review) meta.appendChild(txt('span', '', 'sudah dicek, menunggu approve'));
+    if (c.link) { const a = txt('a', '', 'Buka'); a.href = c.link; meta.appendChild(a); }
+    if (!c.live) {
+      const ok = txt('button', 'mini-btn ok', '✓ Approve'); ok.type = 'button'; ok.title = 'Selesai dan sudah dicek';
+      ok.addEventListener('click', () => act({ action: 'approve', id: c.id, desk: d.id, text: c.text }, ok));
+      meta.appendChild(ok);
+    }
+    bodyEl.appendChild(meta); li.appendChild(bodyEl); ul.appendChild(li);
+  });
+  document.getElementById('d-wait').textContent = d.waiting || '—';
+  renderVilla();
+}
+
+/* ---------- villa desk ---------- */
+let VILLA = null;
+const rp = n => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
+const dfmt = (d, o = { day: 'numeric', month: 'short' }) => new Date(d + 'T00:00:00Z').toLocaleDateString('id-ID', { ...o, timeZone: 'UTC' });
+const addD = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+function renderVilla(){
+  const box = document.getElementById('villa-cal');
+  box.hidden = !(VILLA && selected === 'villa');
+  if (box.hidden) return;
+  const v = VILLA;
+  document.getElementById('v-sub').textContent = v.updated_at ? 'Data booking terakhir diperbarui ' + new Date(v.updated_at).toLocaleString('id-ID', { timeZone: 'Asia/Makassar', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' WITA' : 'Belum ada data booking';
+  const who = x => `${x.unit} · ${x.guest}${x.guests ? ' (' + x.guests + ' tamu)' : ''}`;
+  const mv = document.getElementById('v-moves'); mv.replaceChildren();
+  [['today', 'Hari ini'], ['tomorrow', 'Besok']].forEach(([k, label]) => {
+    const b = el('div', 'v-box'); b.appendChild(txt('h3', '', label + ' · ' + dfmt(k === 'today' ? v.today : addD(v.today, 1), { weekday: 'long', day: 'numeric', month: 'short' })));
+    const ul = el('ul');
+    v.moves[k].in.forEach(x => { const li = el('li'); li.append(txt('span', '', '→ Check-in 14:00 WITA · ' + who(x) + ' ')); li.appendChild(txt('small', '', 'sampai ' + dfmt(x.check_out))); ul.appendChild(li); });
+    v.moves[k].out.forEach(x => { const li = el('li'); li.append(txt('span', '', '← Check-out 11:00 WITA · ' + who(x) + ' ')); li.appendChild(txt('small', '', 'housekeeping')); ul.appendChild(li); });
+    if (!ul.children.length) ul.appendChild(txt('li', '', 'Tidak ada check-in / check-out.'));
+    b.appendChild(ul); mv.appendChild(b);
+  });
+  // Calendar: one row per villa, one column per night, from 3 days ago to 6 weeks ahead.
+  const start = addD(v.today, -3), N = 45, days = Array.from({ length: N }, (_, i) => addD(start, i));
+  const cal = document.getElementById('v-cal'); cal.replaceChildren();
+  cal.style.gridTemplateColumns = `auto repeat(${N}, 34px)`;
+  cal.style.gridTemplateRows = `auto repeat(${v.units.length}, 44px)`;
+  const corner = txt('div', 'h u', 'Villa'); corner.style.gridRow = '1'; corner.style.gridColumn = '1'; cal.appendChild(corner);
+  days.forEach((d, i) => { const wd = new Date(d + 'T00:00:00Z').getUTCDay();
+    const h = el('div', 'h' + (wd === 0 || wd === 6 ? ' we' : '') + (d === v.today ? ' today' : ''));
+    h.style.gridRow = '1'; h.style.gridColumn = String(i + 2);
+    h.append(txt('div', '', ['M', 'S', 'S', 'R', 'K', 'J', 'S'][wd]), txt('b', '', String(+d.slice(8))));
+    if (+d.slice(8) === 1 || i === 0) h.title = dfmt(d, { month: 'long', year: 'numeric' });
+    h.setAttribute('aria-label', dfmt(d, { weekday: 'long', day: 'numeric', month: 'long' })); cal.appendChild(h); });
+  v.units.forEach((u, r) => {
+    const lab = txt('div', 'u', u); lab.style.gridRow = String(r + 2); lab.style.gridColumn = '1'; cal.appendChild(lab);
+    days.forEach((d, i) => { const c = el('div', 'cell' + (d === v.today ? ' today' : '')); c.style.gridRow = String(r + 2); c.style.gridColumn = String(i + 2); cal.appendChild(c); });
+    v.calendar.filter(b => b.unit === u && b.status !== 'cancelled' && b.check_out > start && b.check_in <= days[N - 1]).forEach(b => {
+      const s = Math.max(0, Math.round((Date.parse(b.check_in) - Date.parse(start)) / 864e5));
+      const e = Math.min(N, Math.round((Date.parse(b.check_out) - Date.parse(start)) / 864e5));
+      if (e <= s) return;
+      const bar = txt('div', 'bar' + (b.check_out <= v.today ? ' past' : ''), b.guest + (b.guests ? ' · ' + b.guests : ''));
+      bar.title = `${b.guest}${b.guests ? ' (' + b.guests + ' tamu)' : ''}\n${dfmt(b.check_in)} → ${dfmt(b.check_out)} · booking ${b.booking_id}`;
+      bar.style.gridRow = String(r + 2); bar.style.gridColumn = `${s + 2} / ${e + 2}`; cal.appendChild(bar);
+    });
+  });
+  const av = document.getElementById('v-avail'); av.replaceChildren();
+  v.occupancy.forEach(o => { const b = el('div', 'v-box'); b.appendChild(txt('h3', '', o.unit));
+    const ul = el('ul');
+    ul.appendChild(txt('li', '', o.now ? `Terisi: ${o.now.guest}, sampai ${dfmt(o.now.until)}` : 'Kosong sekarang'));
+    ul.appendChild(txt('li', '', o.free_until === 'open' ? `Tersedia mulai ${dfmt(o.free_from)}, belum ada booking berikutnya` : o.free_until ? `Tersedia ${dfmt(o.free_from)} – ${dfmt(o.free_until)} (${Math.round((Date.parse(o.free_until) - Date.parse(o.free_from)) / 864e5)} malam)` : `Langsung disambung ${o.next.guest}`));
+    if (o.next) ul.appendChild(txt('li', '', `Berikutnya: ${o.next.guest}, masuk ${dfmt(o.next.check_in)}`));
+    const li = el('li'); li.appendChild(txt('small', '', `Terisi ${o.month.booked}/${o.month.nights} malam bulan ini (${Math.round(o.month.booked / o.month.nights * 100)}%) · 30 hari ke depan ${Math.round(o.next30.booked / 30 * 100)}%`)); ul.appendChild(li);
+    b.appendChild(ul); av.appendChild(b); });
+  const tiles = document.getElementById('v-tiles'); tiles.replaceChildren();
+  [['Pencairan minggu ini', v.income.this_week], ['Pencairan bulan ini', v.income.this_month], ['Nilai booking check-in bulan ini', v.income.booked_month]]
+    .forEach(([l, n]) => { const t = el('div', 'v-tile'); t.append(txt('b', '', rp(n)), txt('span', '', l)); tiles.appendChild(t); });
+  const wk = document.getElementById('v-weeks'); wk.replaceChildren();
+  const max = Math.max(1, ...v.income.weeks.map(w => w.amount));
+  v.income.weeks.forEach(w => { const row = el('div'); const bar = el('i'); bar.style.width = (w.amount / max * 100) + '%';
+    const track = el('span'); track.appendChild(bar);
+    row.append(txt('span', '', dfmt(w.week)), track, txt('em', '', w.amount ? rp(w.amount) : '—'));
+    row.title = `Minggu mulai ${dfmt(w.week)}: ${w.count} pencairan`; wk.appendChild(row); });
+  const dl = document.getElementById('v-days'); dl.replaceChildren();
+  const daysWith = v.income.days.filter(d => d.amount);
+  daysWith.forEach(d => { const li = el('li'); li.append(txt('span', '', `${dfmt(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}: ${rp(d.amount)} `), txt('small', '', `${d.count} pencairan${d.date > v.today ? ' · akan masuk' : ''}`)); dl.appendChild(li); });
+  if (!daysWith.length) dl.appendChild(txt('li', '', 'Tidak ada pencairan 14 hari terakhir / 7 hari ke depan.'));
+}
+
+/* ---------- start ---------- */
+// Desks and their cards: the Ops run's status when there is one (else the desk list without the sample cards),
+// plus Kevin's own tasks and approvals and the live cards the website computes from its data. Refreshed every minute.
+async function fetchData(){
+  const r = await fetch('/api/status', { credentials: 'same-origin', headers: { accept: 'application/json' }, cache: 'no-store' });
+  const ct = r.headers.get('content-type') || '';
+  if (!r.ok || !ct.includes('json')) return null;
+  const s = await r.json();
+  BOARD = s.board || BOARD; VILLA = s.villa || null;
+  const fromRun = Array.isArray(s.desks);
+  const base = fromRun ? s : { ...SAMPLE, bell: [], desks: SAMPLE.desks.map(d => ({ ...d, cards: [], waiting: '' })) };
+  const t = new Date(s.live_at || Date.now()).toLocaleTimeString('id-ID', { timeZone: 'Asia/Makassar', hour: '2-digit', minute: '2-digit' }) + ' WITA';
+  document.getElementById('source-chip').textContent = (fromRun ? 'Ops ' + (s.asOf || '') + ' · ' : '') + 'Live website ' + t;
+  return merge(base, BOARD, s.live);
+}
+async function load(){
+  try { const d = await fetchData(); if (d) data = d; } catch (e) { /* keep sample data */ }
+  build();
+}
+async function refresh(){
+  let d; try { d = await fetchData(); } catch (e) { return; }
+  if (!d) return;
+  // Keep the desks and mochis where they are; only the cards, lamps and side panel change.
+  d.desks.forEach(n => { const o = data.desks.find(x => x.id === n.id); if (!o) return;
+    Object.assign(o, { cards: n.cards, state: o.state === 'belum' && n.state === 'belum' ? 'belum' : n.state, waiting: n.waiting });
+    if (o.deskEl) { const lamp = o.deskEl.querySelector('.lamp'); if (lamp) lamp.className = 'lamp' + (o.state === 'macet' ? ' red' : '');
+      const st = o.deskEl.querySelector('.stack'); if (st) { st.replaceChildren(); o.cards.forEach(() => st.appendChild(el('i'))); }
+      const sm = o.deskEl.querySelector('.plate small'); if (sm) sm.textContent = statusLine(o); } });
+  data.bell = d.bell; data.done = d.done;
+  renderSide(); select(selected);
+}
+setInterval(() => { if (document.visibilityState === 'visible') refresh(); }, 60000);
+fit();
+load().then(() => requestAnimationFrame((t) => { last = t; tick(t); }));
+})();
+</script>
+
+</body>
+</html>

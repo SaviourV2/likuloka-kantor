@@ -1,0 +1,13 @@
+{
+  "name": "likuloka-kantor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:schema": "wrangler d1 execute likuloka --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.1"
+  }
+}

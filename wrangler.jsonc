@@ -1,0 +1,32 @@
+{
+  // Kantor (kantor.likuloka.com): Kevin's office of Claude desks + the Villa & Kahuna desk.
+  // Same D1 database as likuloka.com (repo SaviourV2/likuloka-web), which owns all other tables.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "likuloka-kantor",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    // Every request goes through the worker first, so nothing is served before the sign-in check.
+    "run_worker_first": true
+  },
+  "routes": [
+    { "pattern": "kantor.likuloka.com", "custom_domain": true }
+  ],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "likuloka", "database_id": "22e96330-dc9b-4a0a-944e-69198eb947ac" }
+  ],
+  "observability": { "enabled": true },
+  "keep_vars": true,
+  "vars": {
+    // The same Cloudflare Access team and application as likuloka.com/admin: add kantor.likuloka.com as a
+    // hostname of that Access application (see README), so the AUD tag is the same.
+    "ACCESS_TEAM_DOMAIN": "likuloka.cloudflareaccess.com",
+    "ACCESS_AUD": "c9eaddde2a74d02429b99573e3ea96b6182d51f634f3755f855d1f380ba02e6f",
+    // Who may open the Kantor (comma-separated). access.js gives these the 'owner' role.
+    "OWNER_EMAILS": "kevinpersonalemail30@gmail.com",
+    "KANTOR_EMAILS": "kevinpersonalemail30@gmail.com"
+  }
+}
