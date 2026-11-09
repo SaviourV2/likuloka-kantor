@@ -99,6 +99,13 @@ export default {
       const a = await checkAccess(req, env), who = a.who;
       if (!who || !canSeeKantor(who, env)) {
         const why = a.why || 'email ini tidak terdaftar untuk Kantor';
+        // Not signed in yet: send the browser to the Cloudflare Access login, which comes back here afterwards.
+        // ?masuk=1 marks the way back, so a hostname Access does not cover shows the reason instead of looping.
+        if (a.login && !p.startsWith('/api/') && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
+          const back = url.pathname + (url.search ? url.search + '&' : '?') + 'masuk=1';
+          const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${env.ACCESS_AUD.split(',')[0].trim()}&redirect_url=${encodeURIComponent(back)}`;
+          return Response.redirect(login, 302);
+        }
         if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
         const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + a.aud, a.iss && 'Issuer: ' + a.iss].filter(Boolean).join('\n');
         return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,

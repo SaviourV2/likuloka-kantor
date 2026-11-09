@@ -37,13 +37,13 @@ export async function checkAccess(req, env) {
   if (env.DEV_BYPASS_AUTH === '1' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return { who: { email: 'dev@localhost', role: 'owner' } };
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return why('ACCESS_TEAM_DOMAIN / ACCESS_AUD belum diisi');
   const token = req.headers.get('cf-access-jwt-assertion') || cookie(req, 'CF_Authorization');
-  if (!token) return why('tidak ada token Cloudflare Access (hostname kantor.likuloka.com belum dilindungi Access)');
+  if (!token) return why('tidak ada token Cloudflare Access (hostname kantor.likuloka.com belum dilindungi Access)', { login: true });
   const parts = token.split('.');
   if (parts.length !== 3) return why('token rusak');
   let header, payload;
   try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); } catch { return why('token rusak'); }
   const t = Math.floor(Date.now() / 1000);
-  if (!payload.exp || payload.exp < t) return why('token kedaluwarsa, buka ulang halaman');
+  if (!payload.exp || payload.exp < t) return why('token kedaluwarsa, buka ulang halaman', { login: true });
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   const allowed = String(env.ACCESS_AUD).split(',').map(x => x.trim());
   if (!aud.some(a => allowed.includes(a))) return why('aplikasi Access berbeda (AUD tidak cocok)', { aud: aud.join(',') });
