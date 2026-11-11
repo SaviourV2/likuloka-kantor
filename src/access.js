@@ -17,15 +17,30 @@ const b64urlJson = s => JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
 function cookie(req, name) {
   const c = req.headers.get('cookie') || '';
   const m = c.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[1]) : null;
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch { return null; }   // a malformed cookie counts as no token
 }
 
-async function jwks(env) {
-  if (Date.now() - jwksCache.at < 10 * 60 * 1000 && jwksCache.keys.length) return jwksCache.keys;
+async function jwks(env, fresh = false) {
+  if (!fresh && Date.now() - jwksCache.at < 10 * 60 * 1000 && jwksCache.keys.length) return jwksCache.keys;
   const r = await fetch(`https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
   if (!r.ok) throw new Error(`Access certs ${r.status}`);
   jwksCache = { at: Date.now(), keys: (await r.json()).keys || [] };
   return jwksCache.keys;
+}
+// The key for a token's kid. Access rotates its keys, so an unknown kid refetches the JWKS once (at most every
+// 30 seconds, so tokens with made-up kids cannot make every request call the certs endpoint).
+async function findKey(env, kid) {
+  const jwk = (await jwks(env)).find(k => k.kid === kid);
+  if (jwk || Date.now() - jwksCache.at < 30 * 1000) return jwk || null;
+  return (await jwks(env, true)).find(k => k.kid === kid) || null;
+}
+// RS256 signature check; a malformed signature or key is just "not valid".
+async function signatureOk(jwk, parts) {
+  try {
+    const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    return await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
+  } catch { return false; }
 }
 
 /** Returns { email, role } for a signed-in owner ('owner') or office team member ('team'), or null.
@@ -42,16 +57,16 @@ export async function checkAccess(req, env) {
   if (parts.length !== 3) return why('token rusak');
   let header, payload;
   try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); } catch { return why('token rusak'); }
+  if (!header || typeof header !== 'object' || !payload || typeof payload !== 'object') return why('token rusak');
   const t = Math.floor(Date.now() / 1000);
   if (!payload.exp || payload.exp < t) return why('token kedaluwarsa, buka ulang halaman', { login: true });
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
   const allowed = String(env.ACCESS_AUD).split(',').map(x => x.trim());
   if (!aud.some(a => allowed.includes(a))) return why('aplikasi Access berbeda (AUD tidak cocok)', { aud: aud.join(',') });
   if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return why('team domain Access berbeda', { iss: payload.iss });
-  const jwk = (await jwks(env)).find(k => k.kid === header.kid);
+  const jwk = await findKey(env, header.kid);
   if (!jwk) return why('kunci Access tidak ditemukan');
-  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true }, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  if (!(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`)))) return why('tanda tangan token tidak valid');
+  if (!(await signatureOk(jwk, parts))) return why('tanda tangan token tidak valid');
   const email = String(payload.email || '').toLowerCase();
   const list = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
   if (!list(env.KANTOR_EMAILS).includes(email)) return why('email ini tidak terdaftar untuk Kantor', { email });
@@ -70,6 +85,7 @@ export async function verifyAccess(req, env) {
   if (parts.length !== 3) return null;
   let header, payload;
   try { header = b64urlJson(parts[0]); payload = b64urlJson(parts[1]); } catch { return null; }
+  if (!header || typeof header !== 'object' || !payload || typeof payload !== 'object') return null;
 
   const now = Math.floor(Date.now() / 1000);
   if (!payload.exp || payload.exp < now) return null;
@@ -78,12 +94,9 @@ export async function verifyAccess(req, env) {
   if (!aud.includes(env.ACCESS_AUD)) return null;
   if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return null;
 
-  const jwk = (await jwks(env)).find(k => k.kid === header.kid);
+  const jwk = await findKey(env, header.kid);
   if (!jwk) return null;
-  const key = await crypto.subtle.importKey('jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-  const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
-  if (!ok) return null;
+  if (!(await signatureOk(jwk, parts))) return null;
 
   const list = v => (v || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   const email = String(payload.email || '').toLowerCase();

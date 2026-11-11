@@ -9,6 +9,48 @@ export const parseJson = (s, fallback) => { try { return s ? JSON.parse(s) : fal
 export const cleanText = (v, n) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 export async function body(req) { try { return await req.json(); } catch { return {}; } }
 
+/** CSRF guard for writes: a JSON body from this same origin only (a cross-site form or no-cors fetch cannot send that). */
+export function sameOriginJson(req) {
+  if (!(req.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return false;
+  if (req.headers.get('origin') !== new URL(req.url).origin) return false;
+  const site = req.headers.get('sec-fetch-site');
+  return site === null || site === 'same-origin';
+}
+
+/** Values the browser may draw or link from kantor_status: a hex colour, an https / same-page / same-site link. */
+export const DEFAULT_COLOR = '#DDE0D2';
+export const safeColor = c => (typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : DEFAULT_COLOR);
+export function safeLink(l) {
+  if (typeof l !== 'string' || !l) return null;
+  if (l.startsWith('#') || /^\/(?![/\\])/.test(l)) return l;
+  try { return new URL(l).protocol === 'https:' ? l : null; } catch { return null; }
+}
+
+// Security headers on every response. The page has one inline <script> (allowed by its sha256 hash, see worker.js),
+// inline <style> blocks and style="" attributes (style-src 'unsafe-inline'), and Google Fonts (css + font files).
+export function csp(scriptHashes = []) {
+  return ["default-src 'self'", `script-src 'self' ${scriptHashes.join(' ')}`.trim(),
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", "font-src https://fonts.gstatic.com",
+    "img-src 'self'", "connect-src 'self'", "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
+}
+export function secure(res, scriptHashes) {
+  const out = new Response(res.body, res);   // copy: Response.redirect() and asset responses have immutable headers
+  out.headers.set('content-security-policy', csp(scriptHashes));
+  out.headers.set('x-content-type-options', 'nosniff');
+  out.headers.set('referrer-policy', 'same-origin');
+  out.headers.set('x-frame-options', 'DENY');
+  return out;
+}
+/** sha256 CSP sources for each inline <script> of an HTML page. */
+export async function inlineScriptHashes(html) {
+  const out = [];
+  for (const m of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(m[1])));
+    out.push(`'sha256-${btoa(String.fromCharCode(...d))}'`);
+  }
+  return out;
+}
+
 export async function getSetting(env, key, fallback) {
   const r = await env.DB.prepare('SELECT value FROM ops_settings WHERE key = ?').bind(key).first();
   return r ? parseJson(r.value, fallback) : fallback;

@@ -176,6 +176,8 @@ aside.side{display:flex;flex-direction:column;gap:14px;min-width:0}
 .cast li i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
 .cast li em{font-style:normal;color:var(--muted);font-size:12px}
 .hint{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0}
+.load-error{margin:0;padding:10px 14px;border-radius:12px;font-size:13.5px;line-height:1.45;color:var(--fg);
+  background:color-mix(in srgb, var(--alert) 14%, var(--card));border:1px solid color-mix(in srgb, var(--alert) 45%, var(--line))}
 /* villa desk: calendar per unit, check-in / check-out, payouts */
 .layout > .villa{grid-column:1;grid-row:2}
 .layout > aside.side{grid-column:2;grid-row:1 / span 2}
@@ -220,8 +222,9 @@ aside.side{display:flex;flex-direction:column;gap:14px;min-width:0}
       <h1>Kantor Mochi</h1>
       <p id="subtitle">Tim Claude untuk usaha Kevin · klik mochi untuk mencolek, klik meja untuk melihat kartunya</p>
     </div>
-    <span style="display:flex;gap:8px;flex-wrap:wrap"><a class="chip" href="https://likuloka.com/admin/" style="text-decoration:none">Dashboard</a><span class="chip" id="source-chip">Data contoh 5 Nov 2026</span></span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap"><a class="chip" href="https://likuloka.com/admin/" style="text-decoration:none">Dashboard</a><span class="chip" id="source-chip">Memuat…</span></span>
   </header>
+  <p class="load-error" id="load-error" role="alert" hidden></p>
 
   <div class="layout">
     <div class="stage-box" id="stage-box">
@@ -337,11 +340,11 @@ aside.side{display:flex;flex-direction:column;gap:14px;min-width:0}
 (() => {
 'use strict';
 
-/* ---------- data (used when /api/status is not available) ---------- */
+/* ---------- data: the desk list; the sample cards only show when the page is opened as a local file (demo) ---------- */
 const SAMPLE = {
   asOf: '2026-11-05',
   bell: [
-    { text: 'Tanyakan ke Bukit Vista: pencairan Sam Lyall kurang Rp 1.440.072 dan 3 unit tercatat ganda', from: 'Villa & Kahuna' },
+    { text: 'Tanyakan ke Bukit Vista: pencairan Tamu Contoh kurang Rp 0 dan 3 unit tercatat ganda', from: 'Villa & Kahuna' },
     { text: 'Cek API key Claude di website likuloka.com (laporan 30 Okt error 403)', from: 'Konstruksi' },
     { text: 'Ganti connector Cloudflare ke versi baru', from: 'Chief' },
   ],
@@ -353,7 +356,7 @@ const SAMPLE = {
     { id:'konstruksi', name:'Konstruksi', role:'Proyek Liku Loka dan Afrodite', color:'#F6D2BC', trait:'pemarah', model:'Sonnet', state:'macet', waiting:'Supervisor Lusso 1 dan Kevin',
       cards:[{ text:'Villa Lusso 1 belum mengirim laporan lapangan sejak 29 Okt', tone:'macet' },{ text:'Laporan Lusso 2 tanggal 30 Okt gagal dianalisis (error 403)', tone:'macet' },{ text:'Fit-out Afrodite mulai 9 Nov', tone:'todo' }] },
     { id:'villa', name:'Villa & Kahuna', role:'Villa, OTA, Kahuna Cafe', color:'#F2CFD6', trait:'pemalu', model:'Haiku, naik ke Sonnet untuk selisih', state:'macet', waiting:'Jawaban Bukit Vista',
-      cards:[{ text:'Pencairan Sam Lyall kurang Rp 1.440.072 (79,8%, seharusnya 85%)', tone:'macet' },{ text:'3 unit tercatat ganda di email booking Oktober', tone:'macet' },{ text:'Cek pencairan Booking.com tamu Oktober setelah 15 Nov', tone:'todo' }] },
+      cards:[{ text:'Pencairan Tamu Contoh kurang Rp 0 (0%, seharusnya 0%)', tone:'macet' },{ text:'3 unit tercatat ganda di email booking Oktober', tone:'macet' },{ text:'Cek pencairan Booking.com tamu Oktober setelah 15 Nov', tone:'todo' }] },
     { id:'checker', name:'Checker', role:'Cek bukti sebelum Done', color:'#F3E6B3', trait:'perfeksionis', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
     { id:'kerapu', name:'Kerapu', role:'Budidaya kerapu Bali Utara', color:'#CDE3F2', trait:'ngantuk', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
     { id:'misc', name:'Misc', role:'Barbershop, perjalanan, lain-lain', color:'#DDE0D2', trait:'penakut', model:'Haiku', state:'santai', waiting:'Tidak ada', cards:[] },
@@ -388,9 +391,18 @@ const FACES = {
   worried:'<path class="ln" d="M31 43 Q37 39 43 43"/><path class="ln" d="M69 43 Q63 39 57 43"/><ellipse cx="38" cy="51" rx="3.4" ry="4.6"/><ellipse cx="62" cy="51" rx="3.4" ry="4.6"/><path class="ln" d="M45 63 Q50 60 55 63"/>',
 };
 const BODY = 'M8 78 C2 56 12 16 50 12 C88 16 98 56 92 78 C88 88 12 88 8 78 Z';
+// kantor_status comes from a routine, so its values are checked before they reach markup, CSS or href.
+const DEFAULT_COLOR = '#DDE0D2', DEFAULT_TRAIT = 'penurut';
+const safeColor = c => (typeof c === 'string' && /^#[0-9a-f]{3,8}$/i.test(c) ? c : DEFAULT_COLOR);
+function safeLink(l){
+  if (typeof l !== 'string' || !l) return null;
+  if (l.startsWith('#') || /^\/(?![/\\])/.test(l)) return l;
+  try { return new URL(l).protocol === 'https:' ? l : null; } catch (e) { return null; }
+}
+const cleanDesk = d => ({ ...d, color: safeColor(d.color), trait: TRAITS[d.trait] ? d.trait : DEFAULT_TRAIT, cards: Array.isArray(d.cards) ? d.cards : [] });
 function slimeSVG(color, expr){
   return `<ellipse cx="50" cy="86" rx="36" ry="5" fill="rgba(0,0,0,.13)"/>
-  <path d="${BODY}" fill="${color}"/>
+  <path d="${BODY}" fill="${safeColor(color)}"/>
   <path d="${BODY}" fill="#D9573A" class="tint"/>
   <path d="M12 74 C20 84 80 84 88 74 C88 82 80 86 50 86 C20 86 12 82 12 74 Z" fill="rgba(0,0,0,.07)"/>
   <ellipse cx="31" cy="31" rx="9" ry="5" fill="rgba(255,255,255,.82)" transform="rotate(-25 31 31)"/>
@@ -445,7 +457,7 @@ const stage = document.getElementById('stage');
 const box = document.getElementById('stage-box');
 const deskLayer = document.getElementById('desks');
 const mochiLayer = document.getElementById('mochis');
-let data = SAMPLE, mochis = [], selected = 'villa';
+let data = null, loaded = false, mochis = [], selected = 'villa';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function fit(){
@@ -708,13 +720,19 @@ function merge(base, board, live){
   out.done = Object.entries(dec).filter(([, v]) => v.status === 'approved').map(([id, v]) => ({ id, ...v })).sort((a, b) => a.at < b.at ? 1 : -1).slice(0, 15);
   return out;
 }
+// Returns true when the board saved it. On failure the button says so (with the reason as its tooltip).
 async function act(body, btn){
-  if (btn) btn.disabled = true;
+  if (btn) { btn.dataset.label ||= btn.textContent; btn.disabled = true; btn.title = ''; }
   try {
     const r = await fetch('/api/card', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label; }
     await refresh();
-  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Gagal, coba lagi'; } }
+    return true;
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Gagal, coba lagi'; btn.title = 'Belum tersimpan: ' + e.message; }
+    return false;
+  }
 }
 const rtEvery = document.getElementById('rt-every'), rtDay = document.getElementById('rt-day');
 function rtDays(){
@@ -726,11 +744,12 @@ function rtDays(){
 rtEvery.addEventListener('change', rtDays); rtDays();
 document.getElementById('rt-form').addEventListener('submit', e => {
   e.preventDefault(); const i = document.getElementById('rt-text'); const text = i.value.trim(); if (text.length < 3) return;
-  act({ action: 'add_routine', desk: document.getElementById('rt-desk').value, text, every: rtEvery.value, day: rtDay.value }).then(() => { i.value = ''; });
+  act({ action: 'add_routine', desk: document.getElementById('rt-desk').value, text, every: rtEvery.value, day: rtDay.value }, e.target.querySelector('button[type=submit]'))
+    .then(ok => { if (ok) i.value = ''; });
 });
 document.getElementById('add-task').addEventListener('submit', e => {
   e.preventDefault(); const i = document.getElementById('add-text'); const text = i.value.trim(); if (text.length < 3) return;
-  act({ action: 'add', desk: selected, text }).then(() => { i.value = ''; });
+  act({ action: 'add', desk: selected, text }, e.target.querySelector('button[type=submit]')).then(ok => { if (ok) i.value = ''; });
 });
 
 function select(id){
@@ -754,7 +773,8 @@ function select(id){
     else if (c.own) meta.appendChild(txt('span', '', 'tugas dari Kevin'));
     else if (c.routine) meta.appendChild(txt('span', '', 'rutinitas'));
     if (c.review) meta.appendChild(txt('span', '', 'sudah dicek, menunggu approve'));
-    if (c.link) { const a = txt('a', '', 'Buka'); a.href = c.link; meta.appendChild(a); }
+    const href = safeLink(c.link);
+    if (href) { const a = txt('a', '', 'Buka'); a.href = href; meta.appendChild(a); }
     if (!c.live) {
       const ok = txt('button', 'mini-btn ok', '✓ Approve'); ok.type = 'button'; ok.title = 'Selesai dan sudah dicek';
       ok.addEventListener('click', () => act({ action: 'approve', id: c.id, desk: d.id, text: c.text }, ok));
@@ -837,25 +857,44 @@ function renderVilla(){
 /* ---------- start ---------- */
 // Desks and their cards: the Ops run's status when there is one (else the desk list without the sample cards),
 // plus Kevin's own tasks and approvals and the live cards the website computes from its data. Refreshed every minute.
+const empty = () => ({ ...SAMPLE, bell: [], desks: SAMPLE.desks.map(d => ({ ...d, cards: [], waiting: '' })) });   // desk list, no cards
 async function fetchData(){
-  const r = await fetch('/api/status', { credentials: 'same-origin', headers: { accept: 'application/json' }, cache: 'no-store' });
+  let r;
+  try { r = await fetch('/api/status', { credentials: 'same-origin', headers: { accept: 'application/json' }, cache: 'no-store' }); }
+  catch (e) { throw new Error('Tidak bisa menghubungi server Kantor. Cek koneksi internet, lalu muat ulang halaman.'); }
   const ct = r.headers.get('content-type') || '';
-  if (!r.ok || !ct.includes('json')) return null;
+  // 401 / 403, or a sign-in page instead of JSON: the Access session ran out.
+  if (r.status === 401 || r.status === 403 || (r.ok && !ct.includes('json')))
+    throw new Error('Sesi masuk habis atau belum masuk. Muat ulang halaman untuk masuk lagi lewat Cloudflare Access.');
+  if (!r.ok) throw new Error(`Server Kantor sedang error (${r.status}). Coba lagi sebentar lagi.`);
   const s = await r.json();
   BOARD = s.board || BOARD; VILLA = s.villa || null;
   const fromRun = Array.isArray(s.desks);
-  const base = fromRun ? s : { ...SAMPLE, bell: [], desks: SAMPLE.desks.map(d => ({ ...d, cards: [], waiting: '' })) };
+  const base = fromRun ? { ...s, desks: s.desks.map(cleanDesk) } : empty();
   const t = new Date(s.live_at || Date.now()).toLocaleTimeString('id-ID', { timeZone: 'Asia/Makassar', hour: '2-digit', minute: '2-digit' }) + ' WITA';
   document.getElementById('source-chip').textContent = (fromRun ? 'Ops ' + (s.asOf || '') + ' · ' : '') + 'Live website ' + t;
   return merge(base, BOARD, s.live);
 }
+// When the data cannot be loaded the page says so; it never shows the sample cards as if they were real.
+function showError(msg){
+  const box = document.getElementById('load-error');
+  box.hidden = !msg; box.textContent = msg || '';
+  if (msg) document.getElementById('source-chip').textContent = 'Data tidak tersedia';
+}
 async function load(){
-  try { const d = await fetchData(); if (d) data = d; } catch (e) { /* keep sample data */ }
+  if (location.protocol === 'file:') {   // opened as a local file: demo with the sample cards
+    data = { ...SAMPLE, desks: SAMPLE.desks.map(cleanDesk) };
+    document.getElementById('source-chip').textContent = 'Data contoh (demo lokal)';
+  } else {
+    try { data = await fetchData(); loaded = true; showError(''); }
+    catch (e) { data = empty(); showError('Data Kantor gagal dimuat: ' + e.message); }
+  }
   build();
 }
 async function refresh(){
-  let d; try { d = await fetchData(); } catch (e) { return; }
-  if (!d) return;
+  let d; try { d = await fetchData(); showError(''); }
+  catch (e) { showError(loaded ? 'Data Kantor gagal diperbarui (yang tampil data terakhir): ' + e.message : 'Data Kantor gagal dimuat: ' + e.message); return; }
+  if (!loaded) { loaded = true; data = d; build(); return; }   // first good load after a failed one: draw the real desks
   // Keep the desks and mochis where they are; only the cards, lamps and side panel change.
   d.desks.forEach(n => { const o = data.desks.find(x => x.id === n.id); if (!o) return;
     Object.assign(o, { cards: n.cards, state: o.state === 'belum' && n.state === 'belum' ? 'belum' : n.state, waiting: n.waiting });

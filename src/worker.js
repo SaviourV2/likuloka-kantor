@@ -3,7 +3,7 @@
 // ops_settings 'kantor_status' / 'kantor_board' and the villa_* tables). Cloudflare Access sits in front of the
 // whole hostname; the worker checks the Access JWT again and lets only KANTOR_EMAILS in.
 import { checkAccess } from './access.js';
-import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
+import { body, cleanText, getSetting, inlineScriptHashes, json, missingReports, now, safeColor, safeLink, sameOriginJson, secure, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
 
 const SITE = 'https://likuloka.com';   // the main site's /admin pages that live cards link to
@@ -13,6 +13,7 @@ const canSeeKantor = (who, env) => who.email === 'dev@localhost' || asList(env.K
 // Kantor board (ops_settings 'kantor_board'): Kevin's decisions on cards (approved = done and checked) and the
 // tasks he adds himself. The scheduled Ops run reads it to close approved cards and pick up new tasks.
 const KANTOR_BOARD = 'kantor_board';
+const MAX_DECISIONS = 500;
 async function kantorCard(env, d, who) {
   const b = (await getSetting(env, KANTOR_BOARD, null)) || { added: [], decisions: {} };
   b.added ||= []; b.decisions ||= {}; b.routines ||= [];
@@ -33,10 +34,17 @@ async function kantorCard(env, d, who) {
   } else if (d.action === 'delete_routine') {
     b.routines = b.routines.filter(r => r.id !== id);
   } else return json({ error: 'Aksi tidak dikenal' }, 400);
-  // Keep the board small: approved tasks Kevin added drop off after 60 days, old decisions too.
+  // Keep the board small: approved tasks Kevin added drop off after 60 days, old decisions too, and at most
+  // MAX_DECISIONS decisions are kept (newest first). An approved task leaves together with its decision, so it
+  // does not come back as open.
   const cutoff = new Date(Date.now() - 60 * 864e5).toISOString();
-  for (const [k, v] of Object.entries(b.decisions)) if (v.at < cutoff) delete b.decisions[k];
   b.added = b.added.filter(t => !(b.decisions[t.id]?.status === 'approved' && b.decisions[t.id].at < cutoff)).slice(-200);
+  for (const [k, v] of Object.entries(b.decisions)) if (v.at < cutoff) delete b.decisions[k];
+  const newest = Object.keys(b.decisions).sort((x, y) => (b.decisions[x].at < b.decisions[y].at ? 1 : -1));
+  for (const k of newest.slice(MAX_DECISIONS)) {
+    if (b.decisions[k].status === 'approved') b.added = b.added.filter(t => t.id !== k);
+    delete b.decisions[k];
+  }
   b.routines = b.routines.slice(-100);
   await setSetting(env, KANTOR_BOARD, b);
   return { ok: true, board: b };
@@ -54,7 +62,7 @@ function routineCards(board, today) {
     else if (r.every === 'weekly') { const wd = t.getUTCDay() || 7; last = new Date(t.getTime() - ((wd - r.day + 7) % 7) * 864e5); }
     else { const at = (yy, mm) => new Date(Date.UTC(yy, mm, Math.min(r.day, new Date(Date.UTC(yy, mm + 1, 0)).getUTCDate())));
       last = at(y, m - 1); if (last > t) last = at(m === 1 ? y - 1 : y, m === 1 ? 11 : m - 2); }
-    if (r.at && iso(last) < r.at.slice(0, 10)) continue;          // not due yet since it was added
+    if (r.at && !isNaN(Date.parse(r.at)) && iso(last) < witaDate(new Date(r.at))) continue;   // not due yet since it was added (both WITA)
     const id = `r:${r.id}:${iso(last)}`;
     if (dec[id]?.status === 'approved') continue;
     const when = r.every === 'daily' ? 'harian' : r.every === 'weekly' ? 'tiap ' + WD[r.day] : 'tiap tanggal ' + r.day;
@@ -67,22 +75,24 @@ function routineCards(board, today) {
 async function kantorLive(env) {
   const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
   const today = witaDate(), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
+  // Each source on its own: one failing query (e.g. a table renamed on the main site) only drops its own cards.
+  const safe = (what, p, fallback) => p.catch(e => { console.error('live ' + what, e); return fallback; });
   const [waiting, errors, rejected, nota, quiet, sheet, wenv, missing] = await Promise.all([
-    q("SELECT COUNT(*) AS n, MIN(report_date) AS since FROM field_reports WHERE approval = 'waiting'").first(),
-    q("SELECT id, project_id, report_date FROM field_reports WHERE analysis_status = 'error' ORDER BY id DESC LIMIT 5").all().then(r => r.results),
-    q("SELECT COUNT(*) AS n FROM field_reports WHERE approval = 'rejected' AND id NOT IN (SELECT report_id FROM report_redo) AND decided_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days')").first(),
-    q("SELECT COUNT(*) AS n, COALESCE(SUM(amount),0) AS s FROM journal WHERE status = 'pending'").first(),
-    q(`SELECT p.id, p.name, (SELECT MAX(report_date) FROM field_reports r WHERE r.project_id = p.id) AS last FROM projects p
-      WHERE p.status = 'in_progress' AND (p.started IS NULL OR p.started <= ?)`, today.slice(0, 7)).all().then(r => r.results),
-    getSetting(env, 'jurnal_sheet', null), getSetting(env, 'worker_env', null),
+    safe('waiting', q("SELECT COUNT(*) AS n, MIN(report_date) AS since FROM field_reports WHERE approval = 'waiting'").first(), null),
+    safe('errors', q("SELECT id, project_id, report_date FROM field_reports WHERE analysis_status = 'error' ORDER BY id DESC LIMIT 5").all().then(r => r.results), []),
+    safe('rejected', q("SELECT COUNT(*) AS n FROM field_reports WHERE approval = 'rejected' AND id NOT IN (SELECT report_id FROM report_redo) AND decided_at > strftime('%Y-%m-%dT%H:%M:%SZ','now','-30 days')").first(), null),
+    safe('nota', q("SELECT COUNT(*) AS n, COALESCE(SUM(amount),0) AS s FROM journal WHERE status = 'pending'").first(), null),
+    safe('quiet', q(`SELECT p.id, p.name, (SELECT MAX(report_date) FROM field_reports r WHERE r.project_id = p.id) AS last FROM projects p
+      WHERE p.status = 'in_progress' AND (p.started IS NULL OR p.started <= ?)`, today.slice(0, 7)).all().then(r => r.results), []),
+    safe('jurnal_sheet', getSetting(env, 'jurnal_sheet', null), null), safe('worker_env', getSetting(env, 'worker_env', null), null),
     hour >= 15 ? missingReports(env, today).catch(() => []) : [],
   ]);
   const live = { konstruksi: [], ops: [] }, card = (desk, key, text, tone, link) => live[desk].push({ id: 'live:' + key, text, tone, live: true, link });
   if (waiting?.n) card('konstruksi', 'waiting', `${waiting.n} laporan lapangan menunggu approve (sejak ${waiting.since})`, 'kevin', SITE + '/admin/ops');
-  for (const e of errors) card('konstruksi', 'err' + e.id, `Laporan #${e.id} (${e.project_id}, ${e.report_date}) gagal dianalisa; dicoba ulang otomatis`, 'macet', SITE + '/admin/ops');
+  for (const e of errors || []) card('konstruksi', 'err' + e.id, `Laporan #${e.id} (${e.project_id}, ${e.report_date}) gagal dianalisa; dicoba ulang otomatis`, 'macet', SITE + '/admin/ops');
   if (rejected?.n) card('konstruksi', 'rejected', `${rejected.n} laporan ditolak belum dikirim ulang oleh tim lapangan`, 'todo', SITE + '/admin/ops');
   const stale = d => d && (Date.parse(today) - Date.parse(d)) / 864e5;
-  for (const p of quiet) if (!p.last || stale(p.last) >= 2) card('konstruksi', 'quiet-' + p.id, `${p.name}: belum ada laporan lapangan ${p.last ? 'sejak ' + p.last : 'sama sekali'}`, 'macet', SITE + '/admin/ops');
+  for (const p of quiet || []) if (!p.last || stale(p.last) >= 2) card('konstruksi', 'quiet-' + p.id, `${p.name}: belum ada laporan lapangan ${p.last ? 'sejak ' + p.last : 'sama sekali'}`, 'macet', SITE + '/admin/ops');
   if (missing.length) card('konstruksi', 'missing', `Belum lapor hari ini: ${[...new Set(missing.map(m => m.name))].join(', ')}`, 'todo', SITE + '/admin/ops');
   if (nota?.n) card('ops', 'nota', `${nota.n} nota lapangan menunggu keputusan (Rp ${Math.round(nota.s).toLocaleString('id-ID')})`, 'kevin', SITE + '/admin/jurnal');
   for (const s of (sheet?.skipped || []).filter(x => /tidak dikenal|tanpa jumlah/.test(x.why))) card('ops', 'sheet' + s.row, `Jurnal sheet baris ${s.row}: ${s.why}`, 'macet', SITE + '/admin/jurnal');
@@ -92,40 +102,63 @@ async function kantorLive(env) {
   return live;
 }
 
+// kantor_status is written by a routine, not by this page: keep only colours and links the page can use safely.
+function cleanStatus(s) {
+  if (!s || !Array.isArray(s.desks)) return s;
+  return { ...s, desks: s.desks.map(d => ({ ...d, color: safeColor(d?.color),
+    cards: Array.isArray(d?.cards) ? d.cards.map(c => ({ ...c, link: safeLink(c?.link) })) : [] })) };
+}
+
 export default {
   async fetch(req, env) {
-    const url = new URL(req.url), p = url.pathname, m = req.method;
+    let res, hashes = [];
     try {
-      const a = await checkAccess(req, env), who = a.who;
-      if (!who || !canSeeKantor(who, env)) {
-        const why = a.why || 'email ini tidak terdaftar untuk Kantor';
-        // Not signed in yet: send the browser to the Cloudflare Access login, which comes back here afterwards.
-        // ?masuk=1 marks the way back, so a hostname Access does not cover shows the reason instead of looping.
-        if (a.login && !p.startsWith('/api/') && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
-          const back = url.pathname + (url.search ? url.search + '&' : '?') + 'masuk=1';
-          const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${env.ACCESS_AUD.split(',')[0].trim()}&redirect_url=${encodeURIComponent(back)}`;
-          return Response.redirect(login, 302);
-        }
-        if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
-        const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + a.aud, a.iss && 'Issuer: ' + a.iss].filter(Boolean).join('\n');
-        return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
-          { status: 401, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+      res = await handle(req, env);
+      // The page's inline script is allowed by its hash, so an injected <script> or on*= attribute does not run.
+      if ((res.headers.get('content-type') || '').startsWith('text/html') && res.body) {
+        const html = await res.text();
+        hashes = await inlineScriptHashes(html);
+        res = new Response(html, res);
       }
-      if (p === '/api/status' && m === 'GET') {
-        const [status, board, live, villa] = await Promise.all([getSetting(env, 'kantor_status', null), getSetting(env, KANTOR_BOARD, null), kantorLive(env),
-          villaStatus(env).catch(e => { console.error('villa', e); return null; })]);
-        if (villa) live.villa = villaCards(villa);
-        for (const [desk, cards] of Object.entries(routineCards(board, witaDate()))) (live[desk] ||= []).push(...cards);
-        return json({ ...(status || { desks: null }), board: board || { added: [], decisions: {}, routines: [] }, live, villa, live_at: now() });
-      }
-      if (p === '/api/card' && m === 'POST') { const r = await kantorCard(env, await body(req), who); return r instanceof Response ? r : json(r); }
-      if (p.startsWith('/api/')) return json({ error: 'Not found' }, 404);
-      const res = await env.ASSETS.fetch(req);
-      const out = new Response(res.body, res); out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
-      return out;
     } catch (e) {
       console.error(e);
-      return json({ error: 'Server error' }, 500);
+      res = json({ error: 'Server error' }, 500);
     }
+    return secure(res, hashes);
   },
 };
+
+async function handle(req, env) {
+  const url = new URL(req.url), p = url.pathname, m = req.method;
+  // CSRF: every write must be a same-origin JSON request (checked before sign-in and before any DB access).
+  if (m !== 'GET' && m !== 'HEAD' && !sameOriginJson(req)) return json({ error: 'Permintaan ditolak (bukan dari halaman Kantor)' }, 403);
+  const a = await checkAccess(req, env), who = a.who;
+  if (!who || !canSeeKantor(who, env)) {
+    const why = a.why || 'email ini tidak terdaftar untuk Kantor';
+    // Not signed in yet: send the browser to the Cloudflare Access login, which comes back here afterwards.
+    // ?masuk=1 marks the way back, so a hostname Access does not cover shows the reason instead of looping.
+    if (a.login && !p.startsWith('/api/') && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
+      // One leading slash only, so the way back can never become a protocol-relative '//other.host' URL.
+      const back = url.pathname.replace(/^\/+/, '/') + (url.search ? url.search + '&' : '?') + 'masuk=1';
+      const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${env.ACCESS_AUD.split(',')[0].trim()}&redirect_url=${encodeURIComponent(back)}`;
+      return Response.redirect(login, 302);
+    }
+    if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
+    // AUD / issuer come from a token that failed the check: shown only as plain text (nosniff), shortened.
+    const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + cleanText(a.aud, 200), a.iss && 'Issuer: ' + cleanText(a.iss, 200)].filter(Boolean).join('\n');
+    return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
+      { status: 401, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
+  }
+  if (p === '/api/status' && m === 'GET') {
+    const [status, board, live, villa] = await Promise.all([getSetting(env, 'kantor_status', null).then(cleanStatus), getSetting(env, KANTOR_BOARD, null), kantorLive(env),
+      villaStatus(env).catch(e => { console.error('villa', e); return null; })]);
+    if (villa) live.villa = villaCards(villa);
+    for (const [desk, cards] of Object.entries(routineCards(board, witaDate()))) (live[desk] ||= []).push(...cards);
+    return json({ ...(status || { desks: null }), board: board || { added: [], decisions: {}, routines: [] }, live, villa, live_at: now() });
+  }
+  if (p === '/api/card' && m === 'POST') { const r = await kantorCard(env, await body(req), who); return r instanceof Response ? r : json(r); }
+  if (p.startsWith('/api/')) return json({ error: 'Not found' }, 404);
+  const res = await env.ASSETS.fetch(req);
+  const out = new Response(res.body, res); out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
+  return out;
+}
