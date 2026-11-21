@@ -5,7 +5,8 @@
 import { checkAccess } from './access.js';
 import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
-import { icalFeed, rentalAction, rentalStatus, syncFeeds } from './rental.js';
+import { icalFeed, rentalAction, rentalStatus, syncFeeds, villaConfig } from './rental.js';
+import { staffByEmail, teamApi } from './team.js';
 
 const SITE = 'https://likuloka.com';   // the main site's /admin pages that live cards link to
 const asList = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
@@ -99,19 +100,29 @@ export default {
     try {
       // Calendar feeds for the booking platforms: no sign-in, the token in the path is the key (dates only).
       if (p.startsWith('/ical/') && m === 'GET') return await icalFeed(req, env, url);
-      const a = await checkAccess(req, env), who = a.who;
+      // Staff page: villa staff sign in with their own email (its own Access application, AUD kept in villa_config)
+      // and reach nothing outside /tim.
+      const isTeam = p === '/tim' || p.startsWith('/tim/');
+      const teamAud = isTeam ? (await villaConfig(env)).team_aud : '';
+      const a = await checkAccess(req, env, isTeam ? { auds: teamAud ? [teamAud] : [], staff: email => staffByEmail(env, email) } : {}), who = a.who;
+      if (isTeam && who) {
+        if (p === '/tim/api') return await teamApi(req, env, who);
+        const res = await env.ASSETS.fetch(req), out = new Response(res.body, res);
+        out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
+        return out;
+      }
       if (!who || !canSeeKantor(who, env)) {
-        const why = a.why || 'email ini tidak terdaftar untuk Kantor';
+        const why = a.why || 'email ini tidak terdaftar untuk Kantor', kid = teamAud || (env.ACCESS_AUD || '').split(',')[0].trim();
         // Not signed in yet: send the browser to the Cloudflare Access login, which comes back here afterwards.
         // ?masuk=1 marks the way back, so a hostname Access does not cover shows the reason instead of looping.
-        if (a.login && !p.startsWith('/api/') && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
+        if (a.login && !p.startsWith('/api/') && p !== '/tim/api' && !url.searchParams.has('masuk') && env.ACCESS_TEAM_DOMAIN && env.ACCESS_AUD) {
           const back = url.pathname + (url.search ? url.search + '&' : '?') + 'masuk=1';
-          const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${env.ACCESS_AUD.split(',')[0].trim()}&redirect_url=${encodeURIComponent(back)}`;
+          const login = `https://${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/login/${url.hostname}?kid=${kid}&redirect_url=${encodeURIComponent(back)}`;
           return Response.redirect(login, 302);
         }
-        if (p.startsWith('/api/')) return json({ error: 'Khusus Kevin', why }, 401);
+        if (p.startsWith('/api/') || p === '/tim/api') return json({ error: isTeam ? 'Khusus tim villa' : 'Khusus Kevin', why }, 401);
         const extra = [a.email && 'Email: ' + a.email, a.aud && 'AUD token: ' + a.aud, a.iss && 'Issuer: ' + a.iss].filter(Boolean).join('\n');
-        return new Response(`Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
+        return new Response(`${isTeam ? 'Halaman tim villa: masuk dengan email yang didaftarkan Kevin.' : 'Kantor khusus untuk Kevin. Masuk lewat Cloudflare Access.'}\n\nAlasan: ${why}${extra ? '\n' + extra : ''}`,
           { status: 401, headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
       }
       if (p === '/api/status' && m === 'GET') {

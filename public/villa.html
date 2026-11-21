@@ -8,79 +8,134 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <style>
-/* Villa Manager: month calendar per villa, money, platform calendars. Same paper palette as the Kantor page. */
+/* Villa Manager: a side menu of sections (home, calendar, bookings, prices, reviews, team, money, settings) and one
+   content column. Same paper palette as the Kantor page. All content is built by villa-app.js. */
 :root{
   --bg:#EFE8DC; --panel:#F8F4EC; --card:#FFFFFF; --line:#DDD2C1; --fg:#2E2B28; --muted:#675E55;
-  --alert:#C2502E; --ok:#7E9A69; --bell:#A87A12; --sky:#5B86A8; --ink:#2E2B28;
+  --alert:#C2502E; --ok:#5F8048; --bell:#A87A12; --sky:#5B86A8; --ink:#2E2B28; --plum:#8A6A9A;
   --s-in:#2a78d6; --s-out:#eb6834;
   --f-display:'Zen Maru Gothic', ui-rounded, system-ui, sans-serif;
   --f-body:'Zen Kaku Gothic New', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#1F1C19; --panel:#26221E; --card:#2E2924; --line:#40392F; --fg:#F1EADF; --muted:#B8AC9C;
-  --alert:#E2704C; --ok:#9DB88A; --bell:#E0B04A; --sky:#8FB4D2; --s-in:#3987e5; --s-out:#d95926; color-scheme:dark}}
+  --bg:#1F1C19; --panel:#26221E; --card:#2E2924; --line:#40392F; --fg:#F1EADF; --muted:#B8AC9C; --ink:#F1EADF;
+  --alert:#E2704C; --ok:#9DB88A; --bell:#E0B04A; --sky:#8FB4D2; --plum:#B99ACB; --s-in:#3987e5; --s-out:#d95926; color-scheme:dark}}
 *{box-sizing:border-box}
 html{color-scheme:light dark}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
 [hidden]{display:none!important}
-.wrap{max-width:1400px;margin-inline:auto;padding:20px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px));display:flex;flex-direction:column;gap:16px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-h1{margin:0;font-family:var(--f-display);font-size:clamp(22px,3vw,30px)}
-header.top p{margin:4px 0 0;color:var(--muted)}
 a{color:inherit}
-h2{margin:0;font-family:var(--f-display);font-size:17px}
+h1,h2{margin:0;font-family:var(--f-display)} h1{font-size:clamp(20px,2.6vw,26px)} h2{font-size:17px}
 h3{margin:0;font-size:12.5px;font-weight:700;letter-spacing:.04em;color:var(--muted);text-transform:uppercase}
-.bar-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
-.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
-.tabs button{border:0;background:none;color:var(--muted);font:inherit;font-weight:700;padding:8px 16px;border-radius:999px;cursor:pointer;min-height:40px}
-.tabs button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
-@media (prefers-color-scheme: dark){.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg)}}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:12.5px} .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* shell */
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100dvh}
+.side{background:var(--panel);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100dvh;overflow-y:auto}
+.brand{font-family:var(--f-display);font-weight:700;font-size:19px;padding:0 8px}
+.brand small{display:block;font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--muted)}
+.side label{padding:0 4px}
+nav.menu{display:grid;gap:2px}
+nav.menu button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:100%;border:0;background:none;color:var(--fg);font:inherit;font-weight:500;text-align:left;padding:9px 10px;border-radius:10px;cursor:pointer;min-height:42px}
+nav.menu button:hover{background:color-mix(in srgb, var(--line) 45%, transparent)}
+nav.menu button[aria-current="page"]{background:var(--ink);color:var(--bg);font-weight:700}
+nav.menu svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.menu .count{margin-left:auto;background:var(--alert);color:#fff;border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px}
+.side .foot{margin-top:auto;font-size:12.5px;color:var(--muted);padding:0 8px;display:grid;gap:4px}
+.main{padding:18px max(18px, env(safe-area-inset-right, 0px)) 48px 18px;display:flex;flex-direction:column;gap:16px;min-width:0;max-width:1320px;width:100%}
+.topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.topbar .left{display:flex;align-items:center;gap:10px;min-width:0}
+#burger{display:none}
 .monthnav{display:flex;align-items:center;gap:6px}
-.monthnav b{font-family:var(--f-display);font-size:17px;min-width:150px;text-align:center}
-button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;padding:8px 12px;cursor:pointer;min-height:40px}
-button:hover{border-color:var(--muted)}
-button.pri{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
-@media (prefers-color-scheme: dark){button.pri{background:var(--fg);border-color:var(--fg)}}
+.monthnav b{font-family:var(--f-display);font-size:16px;min-width:138px;text-align:center}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .side{position:fixed;z-index:30;left:0;top:0;width:260px;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.25)}
+  .side.open{transform:none}
+  #burger{display:inline-flex}
+  .main{padding:14px 16px 48px}
+  #scrim{position:fixed;inset:0;background:rgba(30,25,20,.4);z-index:20}
+}
+@media (prefers-reduced-motion: reduce){.side{transition:none}}
+
+/* pieces */
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:10px;padding:8px 12px;cursor:pointer;min-height:40px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--muted)}
+button.pri,.btn.pri{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
 button.danger{color:var(--alert)}
-button.mini{min-height:32px;padding:4px 10px;font-size:12.5px}
+button.mini,.btn.mini{min-height:32px;padding:4px 10px;font-size:12.5px}
+button:disabled{opacity:.55;cursor:default}
 :focus-visible{outline:2px solid var(--sky);outline-offset:2px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.box.warn{border-color:var(--alert);background:color-mix(in srgb, var(--alert) 8%, var(--card))}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.muted{color:var(--muted)} .small{font-size:12.5px}
-.warn{border-color:var(--alert);background:color-mix(in srgb, var(--alert) 9%, var(--card))}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.between{justify-content:space-between}
 ul.plain{margin:0;padding:0;list-style:none;display:grid;gap:6px}
-ul.plain li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+ul.plain > li{display:flex;gap:8px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;background:var(--card)}
+.tag.in{border-color:var(--ok);color:var(--ok)} .tag.out{border-color:var(--alert);color:var(--alert)} .tag.house{border-color:var(--sky);color:var(--sky)}
+.tag.soon{border-color:var(--bell);color:var(--bell)} .tag.good{background:color-mix(in srgb, var(--ok) 16%, var(--card));border-color:var(--ok);color:var(--fg)}
+.tag.bad{background:color-mix(in srgb, var(--alert) 14%, var(--card));border-color:var(--alert);color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border-radius:999px;min-height:34px;padding:4px 12px;font-size:13px}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.tile b{display:block;font-family:var(--f-display);font-size:20px;font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted)}
+.vcard{text-align:left;align-items:stretch;flex-direction:column;gap:6px;padding:14px;border-radius:14px;justify-content:flex-start;min-height:0}
+.vcard[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.vcard b{font-family:var(--f-display);font-size:17px}
+.meter{height:10px;border-radius:999px;background:color-mix(in srgb, var(--line) 60%, transparent);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:999px;background:var(--s-in);min-width:2px}
+.meter.done i{background:var(--ok)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap}
+tr.click{cursor:pointer} tr.click:hover td{background:color-mix(in srgb, var(--sky) 10%, transparent)}
+.tscroll{overflow-x:auto}
 
-/* calendar */
+/* timeline calendar */
 .cal-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
 .cal{display:grid;font-size:11.5px;min-width:max-content}
-.cal .h{padding:4px 0;text-align:center;color:var(--muted);border-bottom:1px solid var(--line);line-height:1.25;cursor:pointer;border-left:1px solid transparent;background:none;border-radius:0;min-height:0;border-top:0;border-right:0}
+.cal .h{padding:4px 0;text-align:center;color:var(--muted);border:0;border-bottom:1px solid var(--line);line-height:1.25;cursor:pointer;background:none;border-radius:0;min-height:0;display:block}
 .cal .h.we{background:color-mix(in srgb, var(--line) 35%, transparent)}
 .cal .h.today{color:var(--fg);font-weight:700;background:color-mix(in srgb, var(--bell) 22%, transparent)}
 .cal .h.sel{box-shadow:inset 0 -3px 0 var(--ink)}
 .cal .h small{display:block;font-size:10px;height:13px;color:var(--fg);font-weight:700}
-.cal .u{position:sticky;left:0;z-index:3;background:var(--card);padding:0 10px;display:flex;align-items:center;font-weight:700;font-family:var(--f-display);border-right:1px solid var(--line);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+.cal .u{position:sticky;left:0;z-index:3;background:var(--card);padding:0 10px;display:flex;align-items:center;font-weight:700;font-family:var(--f-display);border-right:1px solid var(--line);white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;cursor:default}
 .cal .cell{border-left:1px solid color-mix(in srgb, var(--line) 50%, transparent);border-top:1px solid color-mix(in srgb, var(--line) 50%, transparent);height:46px;cursor:pointer}
 .cal .cell:hover{background:color-mix(in srgb, var(--sky) 14%, transparent)}
 .cal .cell.today{background:color-mix(in srgb, var(--bell) 12%, transparent)}
 .cal .cell.sel{background:color-mix(in srgb, var(--ink) 8%, transparent)}
-.cal .ev{z-index:1;margin:7px 2px;border-radius:7px;padding:0 7px;display:flex;align-items:center;font:inherit;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0;text-align:left;width:0;min-width:calc(100% - 4px);
-  background:color-mix(in srgb, var(--ok) 32%, var(--card));border:1px solid color-mix(in srgb, var(--ok) 65%, var(--line));color:var(--fg)}
+.cal .ev{z-index:1;margin:7px 2px;border-radius:7px;padding:0 7px;display:block;line-height:30px;font:inherit;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:0;text-align:left;width:0;min-width:calc(100% - 4px);
+  background:color-mix(in srgb, var(--ok) 28%, var(--card));border:1px solid color-mix(in srgb, var(--ok) 65%, var(--line));color:var(--fg)}
 .cal .ev.ota{background:color-mix(in srgb, var(--sky) 30%, var(--card));border-color:color-mix(in srgb, var(--sky) 70%, var(--line))}
 .cal .ev.closed{background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 16%, var(--card)) 0 6px, var(--card) 6px 12px);border-color:var(--line);color:var(--muted)}
 .cal .ev.pribadi{background:color-mix(in srgb, var(--bell) 30%, var(--card));border-color:color-mix(in srgb, var(--bell) 70%, var(--line))}
+.cal .ev.acara{background:color-mix(in srgb, var(--plum) 30%, var(--card));border-color:color-mix(in srgb, var(--plum) 70%, var(--line))}
 .cal .ev.maintenance{background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--alert) 26%, var(--card)) 0 6px, color-mix(in srgb, var(--alert) 12%, var(--card)) 6px 12px);border-color:color-mix(in srgb, var(--alert) 60%, var(--line))}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:18px;height:12px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid var(--line)}
 
-/* money */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.tile b{display:block;font-family:var(--f-display);font-size:21px;font-variant-numeric:tabular-nums}
-.tile span{font-size:12px;color:var(--muted)}
-.chart{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;height:200px;align-items:end;border-bottom:1px solid var(--line);padding-top:18px}
-.chart .grp{display:flex;gap:2px;align-items:flex-end;justify-content:center;height:100%;position:relative;border:0;background:none;padding:0;border-radius:0;min-height:0}
+/* price calendar */
+.pcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.pcal .dow{font-size:11.5px;color:var(--muted);text-align:center;padding:2px 0}
+.pcal .d{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px;min-height:66px;display:flex;flex-direction:column;gap:2px;min-width:0;overflow:hidden}
+.pcal .d b{font-variant-numeric:tabular-nums;font-size:13.5px}
+.pcal .d small{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pcal .d.low{border-bottom:3px solid var(--sky)} .pcal .d.high{border-bottom:3px solid var(--bell)} .pcal .d.peak{border-bottom:3px solid var(--alert)}
+.pcal .d.busy{background:color-mix(in srgb, var(--ok) 14%, var(--card))}
+.pcal .d.today{box-shadow:inset 0 0 0 2px var(--ink)}
+@media (max-width:560px){.pcal .d{padding:4px;min-height:58px}.pcal .d b{font-size:11.5px}}
+
+/* chart */
+.chart{position:relative;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;height:190px;align-items:end;border-bottom:1px solid var(--line);padding-top:18px}
+.chart .grp{display:flex;gap:2px;align-items:flex-end;justify-content:center;height:100%;border:0;background:none;padding:0;border-radius:0;min-height:0}
 .chart .grp:hover,.chart .grp:focus-visible{background:color-mix(in srgb, var(--line) 40%, transparent)}
 .chart .grp i{display:block;width:38%;max-width:22px;border-radius:4px 4px 0 0;min-height:1px}
 .chart .grp i.in{background:var(--s-in)} .chart .grp i.out{background:var(--s-out)}
@@ -89,424 +144,48 @@ ul.plain li{display:flex;gap:8px;align-items:baseline;justify-content:space-betw
 .xlab .cur{color:var(--fg);font-weight:700}
 .tip{position:absolute;z-index:5;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.15);white-space:nowrap;top:0}
 .tip b{display:block;margin-bottom:2px}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:12px;color:var(--muted);font-weight:700}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tscroll{overflow-x:auto}
-.tag{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 
 /* forms */
-form.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+form.f,.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
 label{display:grid;gap:4px;font-size:12.5px;color:var(--muted);min-width:0}
 input,select,textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;height:42px;width:100%;min-width:0}
+textarea{height:auto;min-height:110px;resize:vertical;line-height:1.4}
 label.wide{grid-column:1 / -1}
-.checks{display:flex;flex-wrap:wrap;gap:6px 14px;color:var(--fg);font-size:14px}
-.checks label{display:flex;grid-template-columns:none;align-items:center;gap:6px;color:var(--fg);font-size:14px}
-.checks input{width:18px;height:18px;min-height:0;padding:0}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--fg);padding:18px;width:min(560px, calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px}
+.checks label{display:flex;align-items:center;gap:6px;color:var(--fg);font-size:14px}
+.checks input{width:18px;height:18px;padding:0;flex:none}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--fg);padding:18px;width:min(600px, calc(100vw - 24px));max-height:calc(100dvh - 24px)}
 dialog::backdrop{background:rgba(30,25,20,.45)}
-dialog form{display:grid;gap:12px}
-.err{color:var(--alert);font-weight:700;min-height:1.2em}
+dialog > div, dialog > form{display:grid;gap:12px}
+.err{color:var(--alert);font-weight:700}
+.err:empty{display:none}
 .url{font-family:ui-monospace, Menlo, Consolas, monospace;font-size:12px;word-break:break-all;background:var(--bg);border-radius:8px;padding:6px 8px;flex:1 1 220px;min-width:0}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;z-index:20}
-@media (prefers-color-scheme: dark){#toast{background:var(--fg)}}
+.stars{color:var(--bell);letter-spacing:1px;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;z-index:40;max-width:calc(100vw - 32px)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div><h1>Villa Manager</h1><p>Booking, kalender, blokir tanggal dan keuangan villa yang dikelola sendiri. <a href="/">← Kantor</a></p></div>
-    <span class="tag" id="stamp"></span>
-  </header>
-
-  <div class="bar-top">
-    <div class="tabs" role="tablist">
-      <button role="tab" data-tab="kalender" aria-selected="true">Kalender</button>
-      <button role="tab" data-tab="keuangan" aria-selected="false">Keuangan</button>
-      <button role="tab" data-tab="sambungan" aria-selected="false">Villa &amp; platform</button>
+<div class="app">
+  <aside class="side" id="side">
+    <div class="brand">Villa Manager<small>Liku Loka</small></div>
+    <label>Villa yang ditampilkan<select id="villa-pick" aria-label="Pilih villa"></select></label>
+    <nav class="menu" id="menu" aria-label="Menu"></nav>
+    <div class="foot"><a href="/tim/">Halaman tim (karyawan)</a><a href="/">← Kantor</a></div>
+  </aside>
+  <div id="scrim" hidden></div>
+  <main class="main">
+    <div class="topbar">
+      <div class="left"><button id="burger" aria-label="Buka menu">☰</button><div><h1 id="title"></h1><p class="muted small" id="subtitle"></p></div></div>
+      <div class="monthnav" id="monthnav">
+        <button id="prev" aria-label="Bulan sebelumnya">‹</button><b id="month-label"></b><button id="next" aria-label="Bulan berikutnya">›</button>
+        <button id="today-btn">Hari ini</button>
+      </div>
     </div>
-    <div class="monthnav">
-      <button id="prev" aria-label="Bulan sebelumnya">‹</button><b id="month-label"></b><button id="next" aria-label="Bulan berikutnya">›</button>
-      <button id="today-btn">Hari ini</button>
-    </div>
-  </div>
-
-  <div class="panel" id="empty" hidden>
-    <h2>Mulai dengan menambah villa</h2>
-    <p class="muted" style="margin:0">Belum ada villa. Tambahkan villa pertama di tab <b>Villa &amp; platform</b>, lalu sambungkan kalender Airbnb / Booking.com-nya.</p>
-    <div><button class="pri" id="go-setup">Tambah villa</button></div>
-  </div>
-
-  <!-- Kalender -->
-  <section class="panel" id="tab-kalender">
-    <div class="row" style="justify-content:space-between">
-      <h2>Kalender per villa</h2>
-      <div class="row"><button class="pri" id="add-booking">+ Booking</button><button id="add-block">Blokir tanggal</button></div>
-    </div>
-    <div class="box warn" id="conflicts" hidden><h3>Bentrok tanggal</h3><ul class="plain" id="conflict-list"></ul></div>
-    <div class="cal-scroll"><div class="cal" id="cal" role="table" aria-label="Kalender booking per villa"></div></div>
-    <div class="legend">
-      <span><i style="background:color-mix(in srgb, var(--ok) 32%, var(--card))"></i>Booking</span>
-      <span><i style="background:color-mix(in srgb, var(--sky) 30%, var(--card))"></i>Reservasi dari platform</span>
-      <span><i style="background:color-mix(in srgb, var(--bell) 30%, var(--card))"></i>Pemakaian pribadi</span>
-      <span><i style="background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--alert) 26%, var(--card)) 0 4px, var(--card) 4px 8px)"></i>Maintenance</span>
-      <span><i style="background:repeating-linear-gradient(135deg, color-mix(in srgb, var(--muted) 20%, var(--card)) 0 4px, var(--card) 4px 8px)"></i>Ditutup di platform</span>
-      <span>Angka di atas tanggal: → masuk, ← keluar</span>
-    </div>
-    <div class="grid2">
-      <div class="box"><h3 id="day-title"></h3><ul class="plain" id="day-list"></ul></div>
-      <div class="box"><h3>Okupansi bulan ini</h3><ul class="plain" id="occ"></ul></div>
-    </div>
-  </section>
-
-  <!-- Keuangan -->
-  <section class="panel" id="tab-keuangan" hidden>
-    <h2>Keuangan</h2>
-    <div class="tiles" id="tiles"></div>
-    <div class="box">
-      <div class="row" style="justify-content:space-between"><h3>Pemasukan dan pengeluaran, 12 bulan</h3>
-        <div class="legend"><span><i style="background:var(--s-in);border:0"></i>Pemasukan</span><span><i style="background:var(--s-out);border:0"></i>Pengeluaran</span></div></div>
-      <div class="chart" id="chart"></div><div class="xlab" id="xlab"></div>
-      <details><summary class="small muted" style="cursor:pointer">Lihat sebagai tabel</summary><div class="tscroll"><table id="mtable"></table></div></details>
-    </div>
-    <div class="box">
-      <h3>Catat pemasukan lain / pengeluaran</h3>
-      <form class="f" id="ledger-form">
-        <label>Jenis<select name="type"><option value="out">Pengeluaran</option><option value="in">Pemasukan lain</option></select></label>
-        <label>Tanggal<input type="date" name="date" required></label>
-        <label>Kategori<select name="category"></select></label>
-        <label>Villa<select name="villa_id"></select></label>
-        <label>Jumlah (Rp)<input name="amount" inputmode="numeric" placeholder="500.000" required></label>
-        <label>Catatan<input name="note" maxlength="200"></label>
-        <button class="pri">Simpan</button>
-      </form>
-      <div class="err" id="ledger-err"></div>
-      <p class="muted small" style="margin:0">Nilai booking dihitung otomatis sebagai pemasukan di bulan check-in, jadi tidak perlu dicatat lagi di sini.</p>
-    </div>
-    <div class="box"><h3 id="entries-title">Rincian bulan ini</h3><div class="tscroll"><table id="entries"></table></div></div>
-    <div class="box"><h3>Per kategori bulan ini</h3><ul class="plain" id="cats"></ul></div>
-  </section>
-
-  <!-- Villa & platform -->
-  <section class="panel" id="tab-sambungan" hidden>
-    <h2>Villa &amp; sambungan platform</h2>
-    <div class="box">
-      <h3>Tambah villa</h3>
-      <form class="f" id="villa-form">
-        <label>Nama villa<input name="name" maxlength="60" required placeholder="Villa Senja"></label>
-        <label>Catatan<input name="note" maxlength="200" placeholder="Lokasi, jumlah kamar"></label>
-        <button class="pri">Tambah</button>
-      </form>
-      <div class="err" id="villa-err"></div>
-    </div>
-    <div id="villas" style="display:grid;gap:12px"></div>
-    <div class="box">
-      <h3>Cara kerja sinkron kalender</h3>
-      <p style="margin:0">Airbnb, Booking.com, Agoda dan sejenisnya saling bertukar kalender lewat alamat iCal. Sambungan ini dua arah dan dipasang sekali per villa per platform:</p>
-      <ol style="margin:0;padding-left:20px;display:grid;gap:4px">
-        <li><b>Ambil dari platform:</b> salin alamat "Export calendar" dari listing villa di platform, lalu tempel di kolom "Alamat kalender" villa itu. Aplikasi membacanya tiap 30 menit.</li>
-        <li><b>Kirim ke platform:</b> salin alamat "Untuk …" milik villa itu dan tempel di menu "Import calendar" platform yang sama. Dari situ platform menutup tanggal yang sudah dibooking di tempat lain atau diblokir di sini.</li>
-      </ol>
-      <p class="muted small" style="margin:0">Airbnb: Kalender → Ketersediaan → Hubungkan kalender. Booking.com: Kalender → Sinkronkan kalender. Platform mengambil ulang kalender impor menurut jadwal mereka sendiri (biasanya beberapa jam sekali), jadi penutupan tanggal di sana tidak seketika.</p>
-    </div>
-  </section>
+    <div id="view" style="display:flex;flex-direction:column;gap:16px;min-width:0"></div>
+  </main>
 </div>
-
-<dialog id="dlg-booking"><form method="dialog" id="booking-form">
-  <h2 id="booking-title">Booking</h2>
-  <div class="f" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-    <label>Villa<select name="villa_id" required></select></label>
-    <label>Sumber<select name="source"></select></label>
-    <label class="wide">Nama tamu<input name="guest" maxlength="80" required></label>
-    <label>Check-in<input type="date" name="check_in" required></label>
-    <label>Check-out<input type="date" name="check_out" required></label>
-    <label>Jumlah tamu<input name="guests" inputmode="numeric"></label>
-    <label>Nilai booking (Rp)<input name="total" inputmode="numeric" placeholder="yang Anda terima"></label>
-    <label>Kontak<input name="contact" maxlength="80" placeholder="WhatsApp / email"></label>
-    <label>Status<select name="status"><option value="confirmed">Terkonfirmasi</option><option value="cancelled">Dibatalkan</option></select></label>
-    <label class="wide">Catatan<input name="note" maxlength="300"></label>
-  </div>
-  <div class="err" id="booking-err"></div>
-  <div class="row" style="justify-content:space-between">
-    <button type="button" class="danger" id="booking-del" hidden>Hapus booking</button>
-    <span class="row" style="margin-left:auto"><button type="button" data-close>Batal</button><button class="pri" value="save">Simpan</button></span>
-  </div>
-</form></dialog>
-
-<dialog id="dlg-block"><form method="dialog" id="block-form">
-  <h2>Blokir tanggal</h2>
-  <p class="muted small" style="margin:0">Tanggal yang diblokir tidak bisa dibooking di sini, dan ikut ditutup di platform yang sudah mengimpor kalender villa ini.</p>
-  <div><div class="small muted" style="margin-bottom:4px">Villa</div><div class="checks" id="block-villas"></div></div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-    <label>Mulai<input type="date" name="start" required></label>
-    <label>Sampai (termasuk malam ini)<input type="date" name="end" required></label>
-    <label>Alasan<select name="kind"></select></label>
-    <label class="wide">Catatan<input name="note" maxlength="200" placeholder="Keluarga menginap, servis AC, cat ulang"></label>
-  </div>
-  <div class="err" id="block-err"></div>
-  <div class="row" style="justify-content:flex-end"><button type="button" data-close>Batal</button><button class="pri" value="save">Blokir</button></div>
-</form></dialog>
-
-<dialog id="dlg-info"><div style="display:grid;gap:12px">
-  <h2 id="info-title"></h2><ul class="plain" id="info-list"></ul>
-  <div class="row" style="justify-content:flex-end" id="info-actions"></div>
-</div></dialog>
-
+<dialog id="dlg"><div id="dlg-body"></div></dialog>
 <div id="toast" hidden role="status"></div>
-
-<script>
-const $ = id => document.getElementById(id);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const rp = n => 'Rp ' + Math.round(n || 0).toLocaleString('id-ID');
-const rpShort = n => n >= 1e9 ? (n / 1e9).toFixed(1).replace('.', ',') + ' M' : n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',') + ' jt' : Math.round(n / 1e3) + ' rb';
-const dfmt = (d, o = { day: 'numeric', month: 'short' }) => new Date(d + 'T00:00:00Z').toLocaleDateString('id-ID', { ...o, timeZone: 'UTC' });
-const addD = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
-const diff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
-const addM = (ym, n) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7); };
-const CATS = { out: ['Listrik', 'Air', 'Internet', 'Kebersihan & laundry', 'Perbaikan & maintenance', 'Gaji staf', 'Perlengkapan tamu', 'Komisi platform', 'Pajak', 'Lainnya'], in: ['Sewa langsung', 'Layanan tambahan', 'Deposit', 'Lainnya'] };
-
-let D = null, month = null, selDay = null, tab = 'kalender';
-const villaName = id => D.villas.find(v => v.id === id)?.name || 'Semua villa';
-
-function toast(msg){ const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 2600); }
-async function load(){
-  const r = await fetch('/api/villa' + (month ? '?month=' + month : ''), { headers: { accept: 'application/json' }, cache: 'no-store' });
-  if (!r.ok) { toast(r.status === 401 ? 'Sesi habis, muat ulang halaman' : 'Gagal memuat data'); return; }
-  D = await r.json(); month = D.month;
-  if (!selDay || selDay.slice(0, 7) !== month) selDay = D.today.slice(0, 7) === month ? D.today : month + '-01';
-  render();
-}
-async function act(payload, errBox){
-  if (errBox) errBox.textContent = '';
-  const r = await fetch('/api/villa', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const m = j.error || 'Gagal menyimpan'; if (errBox) errBox.textContent = m; else toast(m); return null; }
-  await load(); return j;
-}
-
-function render(){
-  $('month-label').textContent = dfmt(month + '-01', { month: 'long', year: 'numeric' });
-  $('stamp').textContent = 'Hari ini ' + dfmt(D.today, { weekday: 'long', day: 'numeric', month: 'long' }) + ' (WITA)';
-  const none = !D.villas.length;
-  $('empty').hidden = !none || tab === 'sambungan';
-  for (const t of ['kalender', 'keuangan', 'sambungan']) $('tab-' + t).hidden = tab !== t || (none && t !== 'sambungan');
-  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-  fillSelects();
-  if (!none) { renderCal(); renderDay(); renderMoney(); }
-  renderSetup();
-}
-function fillSelects(){
-  const opts = (sel, list, keep) => { const cur = keep ? sel.value : null; sel.replaceChildren(...list.map(([v, l]) => { const o = el('option', '', l); o.value = v; return o; })); if (cur && list.some(([v]) => String(v) === cur)) sel.value = cur; };
-  const villas = D.villas.map(v => [v.id, v.name]);
-  opts($('booking-form').villa_id, villas, true);
-  opts($('booking-form').source, Object.entries(D.sources), true);
-  opts($('block-form').kind, Object.entries(D.block_kinds), true);
-  opts($('ledger-form').villa_id, [['', 'Semua / umum'], ...villas], true);
-  const lf = $('ledger-form'); opts(lf.category, CATS[lf.type.value].map(c => [c, c]), true);
-  if (!lf.date.value) lf.date.value = D.today;
-}
-
-/* ---------- calendar ---------- */
-function events(){   // everything drawn on the calendar, one shape
-  return [
-    ...D.bookings.filter(b => b.status !== 'cancelled').map(b => ({ type: 'booking', cls: '', v: b.villa_id, s: b.check_in, e: b.check_out, label: b.guest + (b.guests ? ' · ' + b.guests : ''), stay: true, raw: b })),
-    ...D.ical.filter(e => !e.covered).map(e => e.kind === 'reserved'
-      ? { type: 'ical', cls: 'ota', v: e.villa_id, s: e.start_date, e: e.end_date, label: 'Reservasi ' + (D.platforms[e.platform] || e.platform), stay: true, raw: e }
-      : { type: 'ical', cls: 'closed', v: e.villa_id, s: e.start_date, e: e.end_date, label: 'Ditutup di ' + (D.platforms[e.platform] || e.platform), raw: e }),
-    ...D.blocks.map(b => ({ type: 'block', cls: b.kind === 'maintenance' ? 'maintenance' : 'pribadi', v: b.villa_id, s: b.start_date, e: b.end_date, label: (D.block_kinds[b.kind] || 'Blokir') + (b.note ? ' · ' + b.note : ''), raw: b })),
-  ];
-}
-function renderCal(){
-  const start = month + '-01', N = diff(start, addM(month, 1) + '-01'), days = Array.from({ length: N }, (_, i) => addD(start, i)), evs = events();
-  const cal = $('cal'); cal.replaceChildren();
-  cal.style.gridTemplateColumns = `auto repeat(${N}, minmax(38px, 1fr))`;
-  const corner = el('div', 'h u', 'Villa'); corner.style.cssText = 'grid-row:1;grid-column:1;cursor:default'; cal.appendChild(corner);
-  days.forEach((d, i) => { const wd = new Date(d + 'T00:00:00Z').getUTCDay();
-    const ins = evs.filter(e => e.stay && e.s === d).length, outs = evs.filter(e => e.stay && e.e === d).length;
-    const h = el('button', 'h' + (wd === 0 || wd === 6 ? ' we' : '') + (d === D.today ? ' today' : '') + (d === selDay ? ' sel' : ''));
-    h.style.gridRow = '1'; h.style.gridColumn = String(i + 2);
-    h.append(el('small', '', [ins ? '→' + ins : '', outs ? '←' + outs : ''].join(' ').trim()), el('div', '', ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'][wd]), el('b', '', String(+d.slice(8))));
-    h.setAttribute('aria-label', dfmt(d, { weekday: 'long', day: 'numeric', month: 'long' }) + `, ${ins} masuk, ${outs} keluar`);
-    h.onclick = () => { selDay = d; renderCal(); renderDay(); }; cal.appendChild(h); });
-  D.villas.forEach((v, r) => {
-    const lab = el('div', 'u', v.name); lab.title = v.name; lab.style.gridRow = String(r + 2); lab.style.gridColumn = '1'; cal.appendChild(lab);
-    days.forEach((d, i) => { const c = el('div', 'cell' + (d === D.today ? ' today' : '') + (d === selDay ? ' sel' : '')); c.style.gridRow = String(r + 2); c.style.gridColumn = String(i + 2);
-      c.onclick = () => { selDay = d; renderCal(); renderDay(); }; cal.appendChild(c); });
-    evs.filter(e => e.v === v.id).forEach(e => {
-      const s = Math.max(0, diff(start, e.s)), en = Math.min(N, diff(start, e.e));
-      if (en <= s) return;
-      const b = el('button', 'ev ' + e.cls, e.label); b.title = `${e.label}\n${dfmt(e.s)} → ${dfmt(e.e)}`;
-      b.style.gridRow = String(r + 2); b.style.gridColumn = `${s + 2} / ${en + 2}`; b.onclick = () => openEvent(e); cal.appendChild(b);
-    });
-  });
-  // Bring the chosen day into view when the month is wider than the screen.
-  const sc = cal.parentElement, hs = cal.querySelector('.h.sel');
-  if (hs && sc.scrollWidth > sc.clientWidth) sc.scrollLeft = Math.max(0, hs.offsetLeft - corner.offsetWidth - 40 * 2);
-  $('conflicts').hidden = !D.conflicts.length;
-  $('conflict-list').replaceChildren(...D.conflicts.map(c => el('li', '', `${villaName(c.villa_id)}, ${dfmt(c.from)} – ${dfmt(c.to)}: ${c.a} dan ${c.b}`)));
-  $('occ').replaceChildren(...D.occupancy.map(o => { const li = el('li');
-    li.append(el('span', '', villaName(o.villa_id)), el('span', 'muted', `${o.booked}/${o.nights} malam terisi (${Math.round(o.booked / o.nights * 100)}%)${o.blocked ? ` · ${o.blocked} malam diblokir` : ''}`)); return li; }));
-}
-function renderDay(){
-  const d = selDay, evs = events(), ul = $('day-list'); ul.replaceChildren();
-  $('day-title').textContent = dfmt(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  const line = (mark, e, extra) => { const li = el('li'); const b = el('button', 'mini', 'Buka'); b.onclick = () => openEvent(e);
-    li.append(el('span', '', `${mark} ${villaName(e.v)} · ${e.label}`), el('span', 'muted small', extra), b); ul.appendChild(li); };
-  evs.filter(e => e.stay && e.s === d).forEach(e => line('→ Masuk:', e, 'sampai ' + dfmt(e.e)));
-  evs.filter(e => e.stay && e.e === d).forEach(e => line('← Keluar:', e, 'sejak ' + dfmt(e.s)));
-  evs.filter(e => e.stay && e.s < d && e.e > d).forEach(e => line('Menginap:', e, dfmt(e.s) + ' – ' + dfmt(e.e)));
-  evs.filter(e => !e.stay && e.s <= d && e.e > d).forEach(e => line('Tertutup:', e, dfmt(e.s) + ' – ' + dfmt(addD(e.e, -1))));
-  const busy = new Set(evs.filter(e => e.s <= d && e.e > d).map(e => e.v)), free = D.villas.filter(v => !busy.has(v.id));
-  ul.appendChild(el('li', 'muted', free.length ? 'Kosong malam ini: ' + free.map(v => v.name).join(', ') : 'Semua villa terisi atau tertutup malam ini.'));
-}
-function openEvent(e){
-  if (e.type === 'booking') return openBooking(e.raw);
-  const list = $('info-list'), acts = $('info-actions'); list.replaceChildren(); acts.replaceChildren();
-  const row = (k, v) => { const li = el('li'); li.append(el('span', 'muted', k), el('span', '', v)); list.appendChild(li); };
-  const close = el('button', '', 'Tutup'); close.onclick = () => $('dlg-info').close();
-  if (e.type === 'block') {
-    $('info-title').textContent = 'Blokir: ' + (D.block_kinds[e.raw.kind] || e.raw.kind);
-    row('Villa', villaName(e.v)); row('Tanggal', dfmt(e.s) + ' – ' + dfmt(addD(e.e, -1)) + ` (${diff(e.s, e.e)} malam)`); if (e.raw.note) row('Catatan', e.raw.note);
-    const del = el('button', 'danger', 'Hapus blokir'); del.onclick = async () => { if (await act({ action: 'block_delete', id: e.raw.id })) { $('dlg-info').close(); toast('Blokir dihapus'); } };
-    acts.append(del, close);
-  } else {
-    $('info-title').textContent = e.label;
-    row('Villa', villaName(e.v)); row('Tanggal', dfmt(e.s) + ' → ' + dfmt(e.e) + ` (${diff(e.s, e.e)} malam)`); if (e.raw.summary) row('Dari kalender', e.raw.summary);
-    if (e.stay) { row('Catatan', 'Kalender platform tidak membawa nama tamu dan nilai. Lengkapi supaya masuk ke keuangan.');
-      const fill = el('button', 'pri', 'Lengkapi sebagai booking'); fill.onclick = () => { $('dlg-info').close(); openBooking({ villa_id: e.v, check_in: e.s, check_out: e.e, source: e.raw.platform }); }; acts.append(fill); }
-    else row('Catatan', 'Tanggal ini ditutup di platform itu sendiri (atau gema dari kalender lain). Dibuka dari platformnya.');
-    acts.append(close);
-  }
-  $('dlg-info').showModal();
-}
-function openBooking(b = {}){
-  const f = $('booking-form'); f.reset(); f.dataset.id = b.id || '';
-  $('booking-title').textContent = b.id ? 'Ubah booking' : 'Booking baru'; $('booking-err').textContent = ''; $('booking-del').hidden = !b.id;
-  f.villa_id.value = b.villa_id || D.villas[0]?.id || ''; f.source.value = b.source || 'langsung'; f.guest.value = b.guest || '';
-  f.check_in.value = b.check_in || selDay; f.check_out.value = b.check_out || addD(f.check_in.value, 1);
-  f.guests.value = b.guests || ''; f.total.value = b.total ? b.total.toLocaleString('id-ID') : ''; f.contact.value = b.contact || ''; f.status.value = b.status || 'confirmed'; f.note.value = b.note || '';
-  $('dlg-booking').showModal();
-}
-function openBlock(){
-  const f = $('block-form'); f.reset(); $('block-err').textContent = '';
-  $('block-villas').replaceChildren(...D.villas.map(v => { const l = el('label'), c = el('input'); c.type = 'checkbox'; c.value = v.id; c.checked = D.villas.length === 1; l.append(c, v.name); return l; }));
-  f.start.value = selDay; f.end.value = selDay; $('dlg-block').showModal();
-}
-
-/* ---------- money ---------- */
-function renderMoney(){
-  const cur = D.months[D.months.length - 1], inc = cur.bookings + cur.other, net = inc - cur.out;
-  const nightsAll = D.occupancy.reduce((n, o) => n + o.nights, 0), booked = D.occupancy.reduce((n, o) => n + o.booked, 0);
-  $('tiles').replaceChildren(...[['Pemasukan bulan ini', rp(inc)], ['Pengeluaran bulan ini', rp(cur.out)], [net < 0 ? 'Rugi bulan ini' : 'Bersih bulan ini', (net < 0 ? '−' : '') + rp(Math.abs(net))], ['Okupansi bulan ini', nightsAll ? Math.round(booked / nightsAll * 100) + '%' : '—']]
-    .map(([l, v]) => { const t = el('div', 'tile'); t.append(el('b', '', v), el('span', '', l)); return t; }));
-  // 12 months, income beside expenses, one shared axis starting at zero.
-  const max = Math.max(1, ...D.months.map(m => Math.max(m.bookings + m.other, m.out))), chart = $('chart');
-  chart.replaceChildren(el('span', 'top', max > 1 ? 'maks. ' + rpShort(max) : 'Belum ada angka'));
-  const tip = el('div', 'tip'); tip.hidden = true; chart.appendChild(tip);
-  D.months.forEach((m, i) => { const g = el('button', 'grp'), a = el('i', 'in'), b = el('i', 'out'), mi = m.bookings + m.other;
-    a.style.height = (mi / max * 100) + '%'; b.style.height = (m.out / max * 100) + '%'; g.append(a, b);
-    const name = dfmt(m.ym + '-01', { month: 'long', year: 'numeric' });
-    g.setAttribute('aria-label', `${name}: pemasukan ${rp(mi)}, pengeluaran ${rp(m.out)}`);
-    const show = () => { tip.replaceChildren(el('b', '', name), el('div', '', 'Pemasukan ' + rp(mi)), el('div', '', 'Pengeluaran ' + rp(m.out)), el('div', 'muted', 'Bersih ' + (mi - m.out < 0 ? '−' : '') + rp(Math.abs(mi - m.out))));
-      tip.hidden = false; tip.style.left = i < 6 ? (g.offsetLeft + g.offsetWidth) + 'px' : ''; tip.style.right = i < 6 ? '' : (chart.offsetWidth - g.offsetLeft) + 'px'; };
-    g.onmouseenter = g.onfocus = show; g.onmouseleave = g.onblur = () => tip.hidden = true;
-    g.onclick = () => { if (m.ym !== month) { month = m.ym; load(); } };
-    chart.appendChild(g); });
-  $('xlab').replaceChildren(...D.months.map(m => el('span', m.ym === month ? 'cur' : '', dfmt(m.ym + '-01', { month: 'short' }))));
-  const mt = $('mtable'); mt.replaceChildren();
-  const head = el('tr'); ['Bulan', 'Booking', 'Pemasukan lain', 'Pengeluaran', 'Bersih'].forEach((h, i) => head.appendChild(el('th', i ? 'num' : '', h))); mt.appendChild(head);
-  D.months.forEach(m => { const tr = el('tr'); tr.append(el('td', '', dfmt(m.ym + '-01', { month: 'long', year: 'numeric' })), el('td', 'num', rp(m.bookings)), el('td', 'num', rp(m.other)), el('td', 'num', rp(m.out)), el('td', 'num', rp(m.bookings + m.other - m.out))); mt.appendChild(tr); });
-
-  // Entries of the month: bookings by check-in, then the ledger.
-  const rows = [...D.bookings.filter(b => b.status !== 'cancelled' && b.check_in.startsWith(month)).map(b => ({ date: b.check_in, type: 'in', category: 'Booking ' + (D.sources[b.source] || b.source), villa_id: b.villa_id, amount: b.total || 0, note: b.guest + (b.total ? '' : ' (nilai belum diisi)'), booking: b })),
-    ...D.ledger].sort((a, b) => b.date.localeCompare(a.date));
-  $('entries-title').textContent = 'Rincian ' + dfmt(month + '-01', { month: 'long', year: 'numeric' });
-  const t = $('entries'); t.replaceChildren();
-  if (!rows.length) { const tr = el('tr'); tr.appendChild(el('td', 'muted', 'Belum ada catatan bulan ini.')); t.appendChild(tr); }
-  else { const h = el('tr'); ['Tanggal', 'Jenis', 'Kategori', 'Villa', 'Catatan', 'Jumlah', ''].forEach((x, i) => h.appendChild(el('th', i === 5 ? 'num' : '', x))); t.appendChild(h); }
-  rows.forEach(r => { const tr = el('tr'), last = el('td');
-    const btn = el('button', 'mini' + (r.booking ? '' : ' danger'), r.booking ? 'Buka' : 'Hapus');
-    btn.onclick = r.booking ? () => openBooking(r.booking) : async () => { if (confirm(`Hapus catatan ${r.category} ${rp(r.amount)}?`) && await act({ action: 'ledger_delete', id: r.id })) toast('Catatan dihapus'); };
-    last.appendChild(btn);
-    const kind = el('td'); kind.appendChild(el('span', 'tag', r.type === 'in' ? 'Masuk' : 'Keluar'));
-    tr.append(el('td', '', dfmt(r.date)), kind, el('td', '', r.category), el('td', '', r.villa_id ? villaName(r.villa_id) : 'Umum'), el('td', 'muted', r.note || ''), el('td', 'num', (r.type === 'in' ? '+ ' : '− ') + rp(r.amount)), last);
-    t.appendChild(tr); });
-  const by = {}; rows.forEach(r => { const k = (r.type === 'in' ? 'Masuk · ' : 'Keluar · ') + r.category; by[k] = (by[k] || 0) + r.amount; });
-  const cats = Object.entries(by).sort((a, b) => b[1] - a[1]);
-  $('cats').replaceChildren(...(cats.length ? cats.map(([k, v]) => { const li = el('li'); li.append(el('span', '', k), el('span', '', rp(v))); return li; }) : [el('li', 'muted', 'Belum ada catatan.')]));
-}
-
-/* ---------- villas & platforms ---------- */
-function renderSetup(){
-  const base = D.ical_export.host ? 'https://' + D.ical_export.host : null, box = $('villas'); box.replaceChildren();
-  D.villas.forEach(v => {
-    const b = el('div', 'box'), head = el('div', 'row'); head.style.justifyContent = 'space-between';
-    const ttl = el('div'); ttl.append(el('b', '', v.name), el('span', 'muted small', v.note ? '  ' + v.note : ''));
-    const btns = el('div', 'row'), ren = el('button', 'mini', 'Ubah nama'), del = el('button', 'mini danger', 'Arsipkan');
-    ren.onclick = async () => { const name = prompt('Nama villa', v.name); if (name && await act({ action: 'villa_save', id: v.id, name, note: v.note })) toast('Nama diubah'); };
-    del.onclick = async () => { if (confirm(`Arsipkan ${v.name}? Villa hilang dari kalender dan sinkron berhenti; booking dan catatan keuangannya tetap tersimpan.`) && await act({ action: 'villa_delete', id: v.id })) toast('Villa diarsipkan'); };
-    btns.append(ren, del); head.append(ttl, btns); b.appendChild(head);
-
-    b.appendChild(el('h3', '', '1 · Ambil dari platform'));
-    const ul = el('ul', 'plain'); const feeds = D.feeds.filter(f => f.villa_id === v.id);
-    feeds.forEach(f => { const li = el('li'), info = el('span');
-      const when = f.last_sync ? 'terakhir ' + new Date(f.last_sync).toLocaleString('id-ID', { timeZone: 'Asia/Makassar', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' WITA' : 'belum pernah berhasil';
-      info.append(el('b', '', D.platforms[f.platform] || f.platform), el('span', 'muted small', `  ${when}${f.last_sync ? ` · ${f.last_count ?? 0} tanggal aktif` : ''}`));
-      const acts = el('span', 'row'), s = el('button', 'mini', 'Sinkron'), x = el('button', 'mini danger', 'Putuskan');
-      s.onclick = async () => { s.disabled = true; s.textContent = 'Membaca…'; const j = await act({ action: 'feed_sync', id: f.id }); if (j) toast(j.sync[0]?.ok ? 'Kalender terbaca' : 'Gagal: ' + (j.sync[0]?.error || '')); };
-      x.onclick = async () => { if (confirm(`Putuskan kalender ${D.platforms[f.platform] || f.platform} dari ${v.name}? Reservasi yang terbaca dari sana ikut hilang dari kalender.`) && await act({ action: 'feed_delete', id: f.id })) toast('Sambungan diputus'); };
-      acts.append(s, x); li.append(info, acts);
-      if (f.last_error) { const e = el('div', 'err small', 'Gagal dibaca: ' + f.last_error); e.style.flexBasis = '100%'; li.appendChild(e); }
-      ul.appendChild(li); });
-    if (!feeds.length) ul.appendChild(el('li', 'muted', 'Belum ada kalender platform yang tersambung.'));
-    b.appendChild(ul);
-    const form = el('form', 'f'), sel = el('select'), url = el('input'), add = el('button', 'pri', 'Sambungkan'), err = el('div', 'err');
-    Object.entries(D.platforms).forEach(([k, l]) => { const o = el('option', '', l); o.value = k; sel.appendChild(o); });
-    url.type = 'url'; url.required = true; url.placeholder = 'https://www.airbnb.com/calendar/ical/….ics';
-    const l1 = el('label', '', 'Platform'), l2 = el('label', '', 'Alamat kalender (iCal) dari platform'); l1.appendChild(sel); l2.appendChild(url); l2.style.gridColumn = 'span 2';
-    form.append(l1, l2, add);
-    form.onsubmit = async ev => { ev.preventDefault(); add.disabled = true; const j = await act({ action: 'feed_add', villa_id: v.id, platform: sel.value, url: url.value }, err); add.disabled = false;
-      if (j) toast(j.sync[0]?.ok ? `Tersambung, ${j.sync[0].count} tanggal terbaca` : 'Tersimpan, tapi belum terbaca: ' + (j.sync[0]?.error || '')); };
-    b.append(form, err);
-
-    b.appendChild(el('h3', '', '2 · Kirim ke platform'));
-    if (!base) b.appendChild(el('p', 'muted small', 'Alamat kalender keluar muncul di sini setelah deploy berikutnya selesai (aplikasi perlu mengenali alamat publiknya dulu).'));
-    else { const out = el('ul', 'plain');
-      [...Object.entries(D.platforms)].forEach(([k, l]) => { const li = el('li'), href = `${base}/ical/${D.ical_export.token}/${v.id}/${k}.ics`, cp = el('button', 'mini', 'Salin');
-        cp.onclick = async () => { try { await navigator.clipboard.writeText(href); toast('Alamat disalin'); } catch { prompt('Salin alamat ini', href); } };
-        const name = el('span', '', k === 'lainnya' ? 'Platform lain' : 'Untuk ' + l); name.style.minWidth = '130px';
-        li.style.flexWrap = 'nowrap'; li.style.alignItems = 'center'; li.append(name, el('span', 'url', href), cp); out.appendChild(li); });
-      b.appendChild(out);
-      b.appendChild(el('p', 'muted small', 'Pakai alamat yang sesuai platformnya, supaya reservasi platform itu tidak dikirim balik ke dirinya sendiri. Isinya hanya tanggal yang tidak tersedia, tanpa nama tamu dan tanpa angka.')); }
-    box.appendChild(b);
-  });
-}
-
-/* ---------- wiring ---------- */
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
-$('go-setup').onclick = () => { tab = 'sambungan'; render(); $('villa-form').name.focus(); };
-$('prev').onclick = () => { month = addM(month, -1); load(); };
-$('next').onclick = () => { month = addM(month, 1); load(); };
-$('today-btn').onclick = () => { month = D.today.slice(0, 7); selDay = D.today; load(); };
-$('add-booking').onclick = () => openBooking();
-$('add-block').onclick = openBlock;
-document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
-$('booking-form').onsubmit = async ev => { ev.preventDefault(); const f = ev.target;
-  const j = await act({ action: 'booking_save', id: f.dataset.id || null, villa_id: f.villa_id.value, source: f.source.value, guest: f.guest.value, check_in: f.check_in.value, check_out: f.check_out.value,
-    guests: f.guests.value, total: f.total.value, contact: f.contact.value, status: f.status.value, note: f.note.value }, $('booking-err'));
-  if (j) { $('dlg-booking').close(); toast('Booking tersimpan'); } };
-$('booking-del').onclick = async () => { const f = $('booking-form'); if (confirm('Hapus booking ini? Nilainya ikut hilang dari keuangan.') && await act({ action: 'booking_delete', id: f.dataset.id }, $('booking-err'))) { $('dlg-booking').close(); toast('Booking dihapus'); } };
-$('block-form').onsubmit = async ev => { ev.preventDefault(); const f = ev.target, ids = [...$('block-villas').querySelectorAll('input:checked')].map(c => c.value);
-  if (!ids.length) { $('block-err').textContent = 'Pilih minimal satu villa'; return; }
-  if (await act({ action: 'block_add', villa_ids: ids, start: f.start.value, end: f.end.value, kind: f.kind.value, note: f.note.value }, $('block-err'))) { $('dlg-block').close(); toast('Tanggal diblokir'); } };
-$('ledger-form').type.onchange = fillSelects;
-$('ledger-form').onsubmit = async ev => { ev.preventDefault(); const f = ev.target;
-  if (await act({ action: 'ledger_add', type: f.type.value, date: f.date.value, category: f.category.value, villa_id: f.villa_id.value, amount: f.amount.value, note: f.note.value }, $('ledger-err'))) { f.amount.value = ''; f.note.value = ''; toast('Tercatat'); } };
-$('villa-form').onsubmit = async ev => { ev.preventDefault(); const f = ev.target;
-  if (await act({ action: 'villa_save', name: f.name.value, note: f.note.value }, $('villa-err'))) { f.reset(); toast('Villa ditambahkan'); } };
-load();
-</script>
+<script src="/villa-app.js"></script>
 </body>
 </html>
