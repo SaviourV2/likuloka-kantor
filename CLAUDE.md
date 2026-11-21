@@ -11,6 +11,11 @@ Kevin's office of Claude desks (mochi slimes) and the Villa & Kahuna desk. Its o
 - This repo owns: ops_settings `kantor_status` (written by Claude's daily routine), `kantor_board` (Kevin's clicks),
   `villa_sync`, and the tables in `schema.sql` (`villa_bookings`, `villa_payouts`). Never change the main site's tables
   from here.
+- Villa Manager (`/villa`, `public/villa.html`, `src/rental.js`, `GET/POST /api/villa`): villas Kevin rents out himself,
+  without Bukit Vista; separate from Kahuna. Tables `vr_*` in `schema.sql` (villas, bookings, blocks, platform calendars,
+  ledger). Platform sync is iCal both ways: the `*/30` cron reads each listing's calendar into `vr_ical_events`, and
+  `/ical/<token>/<villa>/<platform>.ics` (no sign-in, dates only, token in ops_settings `villa_ical`) is what the
+  platforms import. That feed is served on the worker's workers.dev hostname, because Access covers kantor.likuloka.com.
 - Villa bookings / payouts come from Bukit Vista's emails, written by the routine "Liku Loka update harian" (step D).
 - Every push to `main` deploys via `.github/workflows/deploy.yml` (secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID).
 

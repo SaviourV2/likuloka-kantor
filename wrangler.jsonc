@@ -15,6 +15,12 @@
   "routes": [
     { "pattern": "kantor.likuloka.com", "custom_domain": true }
   ],
+  // The workers.dev hostname stays on for /ical/* only in practice: booking platforms cannot pass Cloudflare
+  // Access on kantor.likuloka.com, and every other path still needs a valid Access token (src/access.js).
+  "workers_dev": true,
+  "preview_urls": false,
+  // Villa Manager: read the booking platforms' iCal calendars.
+  "triggers": { "crons": ["*/30 * * * *"] },
   "d1_databases": [
     { "binding": "DB", "database_name": "likuloka", "database_id": "22e96330-dc9b-4a0a-944e-69198eb947ac" }
   ],

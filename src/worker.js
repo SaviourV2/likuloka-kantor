@@ -5,6 +5,7 @@
 import { checkAccess } from './access.js';
 import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
+import { icalFeed, rentalAction, rentalStatus, syncFeeds } from './rental.js';
 
 const SITE = 'https://likuloka.com';   // the main site's /admin pages that live cards link to
 const asList = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
@@ -96,6 +97,8 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url), p = url.pathname, m = req.method;
     try {
+      // Calendar feeds for the booking platforms: no sign-in, the token in the path is the key (dates only).
+      if (p.startsWith('/ical/') && m === 'GET') return await icalFeed(req, env, url);
       const a = await checkAccess(req, env), who = a.who;
       if (!who || !canSeeKantor(who, env)) {
         const why = a.why || 'email ini tidak terdaftar untuk Kantor';
@@ -119,6 +122,8 @@ export default {
         return json({ ...(status || { desks: null }), board: board || { added: [], decisions: {}, routines: [] }, live, villa, live_at: now() });
       }
       if (p === '/api/card' && m === 'POST') { const r = await kantorCard(env, await body(req), who); return r instanceof Response ? r : json(r); }
+      if (p === '/api/villa' && m === 'GET') return await rentalStatus(env, url);
+      if (p === '/api/villa' && m === 'POST') return await rentalAction(env, await body(req), who);
       if (p.startsWith('/api/')) return json({ error: 'Not found' }, 404);
       const res = await env.ASSETS.fetch(req);
       const out = new Response(res.body, res); out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
@@ -127,5 +132,9 @@ export default {
       console.error(e);
       return json({ error: 'Server error' }, 500);
     }
+  },
+  // Every 30 minutes: read the booking platforms' calendars (Villa Manager).
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(syncFeeds(env).catch(e => console.error('ical sync', e)));
   },
 };

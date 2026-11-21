@@ -30,4 +30,9 @@ jobs:
       - name: Villa tables (CREATE IF NOT EXISTS)
         run: npx wrangler d1 execute likuloka --remote --file=schema.sql
       - name: Deploy worker
-        run: npx wrangler deploy
+        run: npx wrangler deploy | tee deploy.log
+      # Villa Manager serves its iCal feeds on the workers.dev hostname; one request there lets the worker learn it.
+      - name: Ping the workers.dev hostname
+        run: |
+          host=$(grep -oE '[a-z0-9.-]+\.workers\.dev' deploy.log | head -1 || true)
+          [ -n "$host" ] && curl -s -o /dev/null -m 20 "https://$host/ical/hello" || echo "No workers.dev hostname in the deploy output"

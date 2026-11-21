@@ -16,3 +16,11 @@ availability, Bukit Vista payouts). See CLAUDE.md for how it works.
 - ops_settings `kantor_board`: Kevin's approvals, his own tasks and routines (this page).
 - `villa_bookings`, `villa_payouts`, ops_settings `villa_sync`: written by the same routine (step D) from Gmail.
 - Live cards are computed on each request from the main site's tables (read-only).
+
+## Villa Manager (`/villa`)
+Self-managed villas: bookings, a month calendar per villa, date blocks (private use, maintenance), income and expenses.
+- Add a villa, then per platform (Airbnb, Booking.com, Agoda, ...): paste the listing's iCal export address into the
+  app, and paste the app's "Untuk <platform>" address into the platform's calendar import.
+- The app's addresses use the worker's workers.dev hostname. The deploy workflow pings it once so the worker knows it;
+  if the addresses do not appear, check that workers.dev is enabled for the account's Workers.
+- Platforms re-read imported calendars on their own schedule (hours, not seconds).
