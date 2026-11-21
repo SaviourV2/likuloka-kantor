@@ -31,16 +31,10 @@ async function jwks(env) {
 /** Returns { email, role } for a signed-in owner ('owner') or office team member ('team'), or null.
  *  Team emails (TEAM_EMAILS) may only open the pages and API listed in TEAM_PAGES / TEAM_API in worker.js. */
 /** Like verifyAccess, but returns { who } or { why, aud?, email? } so the page can say what is wrong. */
-/** opts (only for the staff page /tim): { auds: extra Access application AUD tags, staff: async email => staff row | null }.
- *  A staff member gets { email, role: 'staff', staff }. */
-export async function checkAccess(req, env, opts = {}) {
+export async function checkAccess(req, env) {
   const why = (w, x = {}) => ({ who: null, why: w, ...x });
   const url = new URL(req.url);
-  if (env.DEV_BYPASS_AUTH === '1' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
-    const as = req.headers.get('x-dev-email') || cookie(req, 'dev_email'), row = as && opts.staff ? await opts.staff(as.toLowerCase()) : null;   // local only: try the staff page as a staff member
-    if (as) return row ? { who: { email: row.email, role: 'staff', staff: row } } : why('email ini tidak terdaftar', { email: as });
-    return { who: { email: 'dev@localhost', role: 'owner' } };
-  }
+  if (env.DEV_BYPASS_AUTH === '1' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) return { who: { email: 'dev@localhost', role: 'owner' } };
   if (!env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return why('ACCESS_TEAM_DOMAIN / ACCESS_AUD belum diisi');
   const token = req.headers.get('cf-access-jwt-assertion') || cookie(req, 'CF_Authorization');
   if (!token) return why('tidak ada token Cloudflare Access (hostname kantor.likuloka.com belum dilindungi Access)', { login: true });
@@ -51,7 +45,7 @@ export async function checkAccess(req, env, opts = {}) {
   const t = Math.floor(Date.now() / 1000);
   if (!payload.exp || payload.exp < t) return why('token kedaluwarsa, buka ulang halaman', { login: true });
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  const allowed = [...String(env.ACCESS_AUD).split(',').map(x => x.trim()), ...(opts.auds || [])];
+  const allowed = String(env.ACCESS_AUD).split(',').map(x => x.trim());
   if (!aud.some(a => allowed.includes(a))) return why('aplikasi Access berbeda (AUD tidak cocok)', { aud: aud.join(',') });
   if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return why('team domain Access berbeda', { iss: payload.iss });
   const jwk = (await jwks(env)).find(k => k.kid === header.kid);
@@ -60,10 +54,8 @@ export async function checkAccess(req, env, opts = {}) {
   if (!(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlToBytes(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`)))) return why('tanda tangan token tidak valid');
   const email = String(payload.email || '').toLowerCase();
   const list = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
-  if (list(env.KANTOR_EMAILS).includes(email)) return { who: { email, role: 'owner' } };
-  const row = email && opts.staff ? await opts.staff(email) : null;
-  if (row) return { who: { email, role: 'staff', staff: row } };
-  return why(opts.staff ? 'email ini tidak terdaftar sebagai tim villa' : 'email ini tidak terdaftar untuk Kantor', { email });
+  if (!list(env.KANTOR_EMAILS).includes(email)) return why('email ini tidak terdaftar untuk Kantor', { email });
+  return { who: { email, role: 'owner' } };
 }
 
 export async function verifyAccess(req, env) {
