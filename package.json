@@ -7,6 +7,9 @@
     "deploy": "wrangler deploy",
     "db:schema": "wrangler d1 execute likuloka --remote --file=schema.sql"
   },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0"
+  },
   "devDependencies": {
     "wrangler": "^4.151.1"
   }

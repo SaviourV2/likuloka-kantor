@@ -5,6 +5,10 @@
 import { checkAccess } from './access.js';
 import { body, cleanText, getSetting, json, missingReports, now, setSetting, witaDate } from './common.js';
 import { villaCards, villaStatus } from './villa.js';
+import { dompetApi } from './dompet/api.js';
+import { sendDailyRecap, handleWebhook, WEBHOOK_PATH } from './dompet/telegram.js';
+import { portfolio } from './dompet/report.js';
+import { snapshotPrices } from './dompet/market.js';
 
 const SITE = 'https://likuloka.com';   // the main site's /admin pages that live cards link to
 const asList = v => (v || '').toLowerCase().split(',').map(x => x.trim()).filter(Boolean);
@@ -93,9 +97,12 @@ async function kantorLive(env) {
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url), p = url.pathname, m = req.method;
     try {
+      // Telegram's webhook for the Dompet bot comes without an Access token: it is checked by its secret header and
+      // paired chat instead (src/dompet/telegram.js). Cloudflare Access needs a Bypass rule for this path (README).
+      if (p === WEBHOOK_PATH && m === 'POST') return handleWebhook(req, env, ctx);
       const a = await checkAccess(req, env), who = a.who;
       if (!who || !canSeeKantor(who, env)) {
         const why = a.why || 'email ini tidak terdaftar untuk Kantor';
@@ -119,6 +126,7 @@ export default {
         return json({ ...(status || { desks: null }), board: board || { added: [], decisions: {}, routines: [] }, live, villa, live_at: now() });
       }
       if (p === '/api/card' && m === 'POST') { const r = await kantorCard(env, await body(req), who); return r instanceof Response ? r : json(r); }
+      if (p === '/api/dompet' || p.startsWith('/api/dompet/')) return dompetApi(req, env, url);
       if (p.startsWith('/api/')) return json({ error: 'Not found' }, 404);
       const res = await env.ASSETS.fetch(req);
       const out = new Response(res.body, res); out.headers.set('cache-control', 'no-store'); out.headers.set('x-robots-tag', 'noindex');
@@ -127,5 +135,13 @@ export default {
       console.error(e);
       return json({ error: 'Server error' }, 500);
     }
+  },
+
+  // 13:00 UTC = 21:00 WITA: the Dompet's evening recap on Telegram, and today's BTC / IHSG / portfolio closes.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async () => {
+      const r = await sendDailyRecap(env).catch(e => { console.error('dompet recap', e); return { error: e.message }; });
+      if (!r.ok) { const p = await portfolio(env); await snapshotPrices(env, p.market, p.partial ? null : p.total); }
+    })().catch(e => console.error('dompet cron', e)));
   },
 };

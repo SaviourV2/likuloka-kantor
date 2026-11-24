@@ -18,6 +18,9 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "likuloka", "database_id": "22e96330-dc9b-4a0a-944e-69198eb947ac" }
   ],
+  "compatibility_flags": ["nodejs_compat"],
+  // 21:00 WITA: Dompet evening recap on Telegram + daily price closes.
+  "triggers": { "crons": ["0 13 * * *"] },
   "observability": { "enabled": true },
   "keep_vars": true,
   "vars": {

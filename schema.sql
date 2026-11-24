@@ -29,3 +29,68 @@ CREATE TABLE IF NOT EXISTS villa_payouts (
   expected_date TEXT,                            -- YYYY-MM-DD the money should land
   email_date    TEXT NOT NULL
 );
+
+-- Dompet: Kevin's personal finance (Telegram bot + /dompet page). Money here is Kevin's only (KANTOR_EMAILS).
+-- Amounts are whole rupiah. Dates are YYYY-MM-DD in WITA.
+CREATE TABLE IF NOT EXISTS dompet_pos (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,               -- "Makan", "Transport", "Sewa"
+  emoji      TEXT,
+  period     TEXT NOT NULL DEFAULT 'monthly',    -- daily | weekly | monthly: the rhythm of this spending and its budget
+  budget     INTEGER,                            -- rupiah per period; NULL = no budget
+  archived   INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS dompet_tx (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind        TEXT NOT NULL DEFAULT 'expense',   -- expense | income
+  date        TEXT NOT NULL,
+  amount      INTEGER NOT NULL,                  -- always positive
+  pos_id      INTEGER,                           -- dompet_pos.id (expenses)
+  merchant    TEXT,
+  note        TEXT,
+  account     TEXT,                              -- BCA, cash, GoPay ... as read from the screenshot or message
+  source      TEXT NOT NULL DEFAULT 'web',       -- telegram_text | telegram_photo | telegram_file | web
+  tg_file_id  TEXT,                              -- Telegram file of the screenshot (fetched again on demand; not stored here)
+  tg_chat_msg INTEGER,
+  fingerprint TEXT,                              -- date|amount|merchant, to flag likely duplicates
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dompet_tx_date ON dompet_tx (date);
+CREATE INDEX IF NOT EXISTS dompet_tx_fp ON dompet_tx (fingerprint);
+-- Bitcoin buys and sells. idr = rupiah paid (buy) or received (sell), fees included.
+CREATE TABLE IF NOT EXISTS dompet_btc (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  date       TEXT NOT NULL,
+  side       TEXT NOT NULL,                      -- buy | sell
+  btc        REAL NOT NULL,
+  idr        INTEGER NOT NULL,
+  exchange   TEXT,
+  note       TEXT,
+  source     TEXT NOT NULL DEFAULT 'web',
+  created_at TEXT NOT NULL
+);
+-- Interest-bearing investments (deposito, reksa dana pasar uang, obligasi/SBN, P2P, tabungan).
+-- Interest accrues per day from start_date; see src/dompet/invest.js.
+CREATE TABLE IF NOT EXISTS dompet_invest (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  kind        TEXT NOT NULL DEFAULT 'deposito',
+  principal   INTEGER NOT NULL,
+  rate_pa     REAL NOT NULL,                     -- % per year
+  compounding TEXT NOT NULL DEFAULT 'simple',    -- simple | daily | monthly
+  tax_pct     REAL NOT NULL DEFAULT 0,           -- tax on interest, e.g. 20 for deposito
+  start_date  TEXT NOT NULL,
+  end_date    TEXT,                              -- maturity; interest stops here
+  closed_at   TEXT,                              -- withdrawn; interest stops here
+  note        TEXT,
+  source      TEXT NOT NULL DEFAULT 'web',
+  created_at  TEXT NOT NULL
+);
+-- Daily closes kept by the evening run, for history when a price source is down. symbol: BTCIDR | BTCUSD | IHSG | PORTO
+CREATE TABLE IF NOT EXISTS dompet_prices (
+  date   TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  close  REAL NOT NULL,
+  PRIMARY KEY (date, symbol)
+);
