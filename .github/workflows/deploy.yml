@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 24
       - run: npm install --no-fund --no-audit
-      - name: Villa tables (CREATE IF NOT EXISTS)
+      - name: Kantor tables, villa + dompet (CREATE IF NOT EXISTS)
         run: npx wrangler d1 execute likuloka --remote --file=schema.sql
       - name: Deploy worker
         run: npx wrangler deploy
