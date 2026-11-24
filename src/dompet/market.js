@@ -1,5 +1,5 @@
 // Market prices for the Dompet: Bitcoin (IDR and USD) and IHSG (Jakarta Composite, ^JKSE).
-// Sources are free and need no key: CoinGecko (Indodax as fallback for BTC/IDR) and Yahoo Finance's chart API.
+// Sources are free: CoinGecko, CoinMarketCap (with a key) and Indodax for BTC, Yahoo Finance's chart API for IHSG.
 // Results are cached in ops_settings 'dompet_market' for 10 minutes (history for 6 hours), and the last good value
 // is kept when a source is down, with its time, so the page and the bot always have something honest to show.
 import { getSetting, now, setSetting, witaDate } from '../common.js';
@@ -16,19 +16,42 @@ async function getJson(url, headers = {}) {
 }
 const cgHeaders = env => (env.COINGECKO_API_KEY ? { 'x-cg-demo-api-key': env.COINGECKO_API_KEY } : {});
 
-async function fetchBtc(env) {
-  try {
+// BTC price sources, tried in order until one answers:
+//   CoinGecko      free; with secret COINGECKO_API_KEY (free Demo key) it no longer shares the keyless rate limit,
+//                  which Cloudflare's shared IPs often hit.
+//   CoinMarketCap  only with secret CMC_API_KEY (free Basic key); one call = one credit, rupiah only.
+//   Indodax        Indonesian exchange ticker, rupiah only, no key.
+const BTC_SOURCES = [
+  ['CoinGecko', async env => {
     const d = await getJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=idr,usd&include_24hr_change=true', cgHeaders(env));
     const b = d.bitcoin;
-    if (!b?.idr) throw new Error('CoinGecko: no price');
-    return { idr: b.idr, usd: b.usd, change_24h: b.idr_24h_change ?? b.usd_24h_change ?? null, source: 'CoinGecko', at: now() };
-  } catch (e) {
-    // Indodax (Indonesian exchange) as fallback: rupiah price only.
-    const d = await getJson('https://indodax.com/api/ticker/btcidr');
-    const t = d.ticker;
-    if (!t?.last) throw new Error(`BTC: ${e.message}; Indodax: no price`);
-    return { idr: Number(t.last), usd: null, change_24h: null, source: 'Indodax', at: now() };
+    if (!b?.idr) throw new Error('no price');
+    return { idr: b.idr, usd: b.usd ?? null, change_24h: b.idr_24h_change ?? b.usd_24h_change ?? null };
+  }],
+  ['CoinMarketCap', async env => {
+    if (!env.CMC_API_KEY) return null;
+    const d = await getJson('https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest?id=1&convert=IDR', { 'X-CMC_PRO_API_KEY': env.CMC_API_KEY });
+    const coin = Array.isArray(d.data?.['1']) ? d.data['1'][0] : d.data?.['1'];
+    const q = coin?.quote?.IDR;
+    if (!q?.price) throw new Error(d.status?.error_message || 'no price');
+    return { idr: q.price, usd: null, change_24h: q.percent_change_24h ?? null };
+  }],
+  ['Indodax', async () => {
+    const t = (await getJson('https://indodax.com/api/ticker/btcidr')).ticker;
+    if (!t?.last) throw new Error('no price');
+    return { idr: Number(t.last), usd: null, change_24h: null };
+  }],
+];
+
+async function fetchBtc(env) {
+  const errors = [];
+  for (const [source, get] of BTC_SOURCES) {
+    try {
+      const v = await get(env);
+      if (v) return { ...v, source, at: now(), ...(errors.length ? { note: errors.join('; ') } : {}) };
+    } catch (e) { errors.push(`${source}: ${e.message}`); }
   }
+  throw new Error(errors.join('; '));
 }
 
 async function fetchBtcHistory(env) {

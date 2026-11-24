@@ -451,6 +451,7 @@ function renderMarket() {
   $('#btc-tiles').innerHTML = [tile('Harga', m.btc ? rp(m.btc.idr) : '–', m.btc?.usd ? '$' + Math.round(m.btc.usd).toLocaleString('en-US') : ''),
     tile('24 jam', m.btc?.change_24h != null ? pct(m.btc.change_24h) : '–', '', m.btc?.change_24h >= 0 ? 'up' : 'down')].join('');
   $('#btc-src').textContent = m.btc ? `${m.btc.source} · ${new Date(m.btc.at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}` : (m.errors.btc || '');
+  $('#btc-src').title = m.btc?.note ? 'Sumber sebelumnya gagal: ' + m.btc.note : '';
   lineChart($('#btc-chart'), m.btc_history, { fmt: v => rupiah(v) });
   const q = m.ihsg, h = m.ihsg_history, mo = h.length > 21 ? h.at(-22).close : null;
   $('#ihsg-tiles').innerHTML = [tile('Penutupan', q ? q.last.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : '–', q?.date ? tgl(q.date) : ''),

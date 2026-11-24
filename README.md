@@ -26,7 +26,9 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
 1. Telegram → @BotFather → `/newbot`. A new bot, not the website's briefing bot (a webhook bot cannot also be polled).
 2. Cloudflare → Workers & Pages → `likuloka-kantor` → Settings → Variables and Secrets → add secrets
    `DOMPET_BOT_TOKEN` (the bot token) and `ANTHROPIC_API_KEY` (same key as likuloka.com; reads screenshots).
-   Optional: `COINGECKO_API_KEY` (free demo key) if CoinGecko starts limiting the free API.
+   Optional, for the BTC price: `COINGECKO_API_KEY` (free Demo key from coingecko.com/en/api, recommended: the
+   keyless API is often rate-limited on Cloudflare's shared IPs) and/or `CMC_API_KEY` (free Basic key from
+   coinmarketcap.com/api). Order: CoinGecko → CoinMarketCap (if a key is set) → Indodax.
 3. Zero Trust → Access → Applications → Add an application → Self-hosted → domain `kantor.likuloka.com`, path
    `tele/dompet` → policy action **Bypass**, include Everyone. Telegram cannot sign in; the worker checks the secret
    header Telegram sends (derived from the bot token) and answers only the paired chat.
@@ -44,7 +46,7 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
   Weeks start Monday, dates are WITA. BTC profit uses average cost.
 - `src/dompet/invest.js`: interest per day = rate ÷ 365 on the principal (simple), or compounded daily / monthly,
   minus tax on interest; stops at maturity or when marked withdrawn (*cairkan*).
-- `src/dompet/market.js`: BTC from CoinGecko (Indodax fallback), IHSG (^JKSE) from Yahoo Finance; cached 10 minutes
+- `src/dompet/market.js`: BTC from CoinGecko (then CoinMarketCap with `CMC_API_KEY`, then Indodax), IHSG (^JKSE) from Yahoo Finance; cached 10 minutes
   in ops_settings `dompet_market`. Daily closes go to `dompet_prices` at 21:00 WITA.
 - Cron `0 13 * * *` (21:00 WITA): recap to Telegram (switch off on the page) + price snapshot.
 
