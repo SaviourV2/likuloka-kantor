@@ -28,13 +28,13 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
    `DOMPET_BOT_TOKEN` (the bot token) and `ANTHROPIC_API_KEY` (same key as likuloka.com; reads screenshots).
    Optional: `COINGECKO_API_KEY` (free demo key) if CoinGecko starts limiting the free API.
 3. Zero Trust → Access → Applications → Add an application → Self-hosted → domain `kantor.likuloka.com`, path
-   `tg/dompet` → policy action **Bypass**, include Everyone. Telegram cannot sign in; the worker checks the secret
+   `tele/dompet` → policy action **Bypass**, include Everyone. Telegram cannot sign in; the worker checks the secret
    header Telegram sends (derived from the bot token) and answers only the paired chat.
 4. kantor.likuloka.com/dompet → tab *Bot Telegram* → *Sambungkan bot* → send the shown `/start 123456` to the bot.
    The tab shows Telegram's last webhook error if step 3 is missing.
 
 **How it works**
-- `src/dompet/telegram.js`: webhook `/tg/dompet`, pairing, commands (`/hari /minggu /bulan /pos /btc /ihsg /bunga
+- `src/dompet/telegram.js`: webhook `/tele/dompet`, pairing, commands (`/hari /minggu /bulan /pos /btc /ihsg /bunga
   /porto /batal /rekap /bantuan`), 🗑 / 🏷 buttons under every record, evening recap.
 - `src/dompet/parse.js`: Claude reads text, photos, image files and PDF statements into expenses / income / BTC trades
   / investments / pos changes (structured output). The low-cost model reads first (more effort for images and PDFs);

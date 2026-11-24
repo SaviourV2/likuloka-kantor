@@ -493,7 +493,7 @@ function renderBot() {
   if (b.error) L.push(`<p class="err">${esc(b.error)}</p>`);
   if (b.chat) {
     L.push(`<p>✅ Tersambung ke <b>${esc(b.chat.name || '')}</b>${b.chat.username ? ' (@' + esc(b.chat.username) + ')' : ''} lewat <b>@${esc(b.bot?.username || '')}</b>.</p>`);
-    if (b.webhook?.error) L.push(`<p class="err">Telegram tidak bisa mengirim ke Kantor: ${esc(b.webhook.error)}${b.webhook.error_at ? ' (' + new Date(b.webhook.error_at).toLocaleString('id-ID') + ')' : ''}. Biasanya karena Cloudflare Access belum punya aturan Bypass untuk <code>/tg/dompet</code> (langkah 3).</p>`);
+    if (b.webhook?.error) L.push(`<p class="err">Telegram tidak bisa mengirim ke Kantor: ${esc(b.webhook.error)}${b.webhook.error_at ? ' (' + new Date(b.webhook.error_at).toLocaleString('id-ID') + ')' : ''}. Biasanya karena Cloudflare Access belum punya aturan Bypass untuk <code>/tele/dompet</code> (langkah 3).</p>`);
     L.push(`<div class="row" style="justify-content:flex-start;margin-top:10px">
       <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--fg)"><input type="checkbox" id="recap-on" style="width:auto"${b.recap ? ' checked' : ''}> Rekap otomatis tiap malam 21:00 WITA</label>
       <button class="btn ghost" id="bot-test">Kirim rekap sekarang</button><button class="btn ghost" id="bot-setup">Pasang ulang webhook</button><button class="btn ghost" id="bot-unpair">Putuskan chat</button></div>`);
@@ -504,7 +504,7 @@ function renderBot() {
       <li>Di Telegram, buka <b>@BotFather</b> → <code>/newbot</code> → beri nama (mis. "Dompet Kevin"). Salin token-nya. Pakai bot baru, bukan bot briefing website.</li>
       <li>Cloudflare → Workers & Pages → <b>likuloka-kantor</b> → Settings → Variables and Secrets → tambah <b>Secret</b> <code>DOMPET_BOT_TOKEN</code> (token tadi) dan <code>ANTHROPIC_API_KEY</code> (sama dengan website). Kevin mengetik sendiri.
         ${b.token ? '✅ token terbaca' : '⏳ token belum terbaca'} · ${b.claude ? '✅ Claude siap' : '⏳ ANTHROPIC_API_KEY belum terbaca'}</li>
-      <li>Cloudflare Zero Trust → Access → Applications → <b>Add an application</b> → Self-hosted → domain <code>kantor.likuloka.com</code>, path <code>tg/dompet</code> → policy action <b>Bypass</b>, include <b>Everyone</b>. (Pesan Telegram tetap diperiksa dengan kunci rahasia dan hanya chat Kevin yang dijawab.)</li>
+      <li>Cloudflare Zero Trust → Access → Applications → <b>Add an application</b> → Self-hosted → domain <code>kantor.likuloka.com</code>, path <code>tele/dompet</code> → policy action <b>Bypass</b>, include <b>Everyone</b>. (Pesan Telegram tetap diperiksa dengan kunci rahasia dan hanya chat Kevin yang dijawab.)</li>
       <li>Tekan tombol di bawah, lalu kirim kode yang muncul ke bot.</li>
     </ol>
     <div class="row" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="bot-setup"${b.token ? '' : ' disabled'}>Sambungkan bot</button></div>`);

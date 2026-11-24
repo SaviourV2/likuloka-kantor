@@ -13,7 +13,7 @@ Kevin's office of Claude desks (mochi slimes) and the Villa & Kahuna desk. Its o
   from here.
 - Villa bookings / payouts come from Bukit Vista's emails, written by the routine "Liku Loka update harian" (step D).
 - Dompet (`/dompet`, `src/dompet/`): Kevin's personal finance. Telegram bot (secret `DOMPET_BOT_TOKEN`, webhook
-  `/tg/dompet` outside Access, secret header + paired chat), Claude reads screenshots (`ANTHROPIC_API_KEY`),
+  `/tele/dompet` outside Access, secret header + paired chat), Claude reads screenshots (`ANTHROPIC_API_KEY`),
   tables `dompet_*`, ops_settings `dompet_telegram` / `dompet_market`, cron 21:00 WITA recap. Details in README.
 - Every push to `main` deploys via `.github/workflows/deploy.yml` (secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID).
 

@@ -1,5 +1,5 @@
 // The Dompet bot on Telegram: Kevin's own bot (secret DOMPET_BOT_TOKEN, separate from the website's briefing bot,
-// because a webhook bot cannot also be read with getUpdates). Telegram posts updates to /tg/dompet; the request must
+// because a webhook bot cannot also be read with getUpdates). Telegram posts updates to /tele/dompet; the request must
 // carry the secret header set at setWebhook, and only the chat paired with a one-time code from /dompet is answered.
 import { getSetting, now, setSetting, witaDate } from '../common.js';
 import { addBtc, addTx, deleteBtc, deleteTx, PERIOD_ID, posWithSpend, rp, savePos, saveInvest } from './db.js';
@@ -7,7 +7,7 @@ import { parseMessage } from './parse.js';
 import { budgetWarnings, dailyRecap, esc, portfolio, posLine, tanggal, textBtcFrom, textIhsgFrom, textInvestFrom, textMonth, textPortoFrom, textPos, textToday, textTotals, textWeek } from './report.js';
 
 const KEY = 'dompet_telegram';
-export const WEBHOOK_PATH = '/tg/dompet';
+export const WEBHOOK_PATH = '/tele/dompet';
 const api = env => env.TELEGRAM_API || 'https://api.telegram.org';
 
 export async function tg(env, method, body) {
