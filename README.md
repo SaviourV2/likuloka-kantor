@@ -37,7 +37,8 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
 - `src/dompet/telegram.js`: webhook `/tg/dompet`, pairing, commands (`/hari /minggu /bulan /pos /btc /ihsg /bunga
   /porto /batal /rekap /bantuan`), 🗑 / 🏷 buttons under every record, evening recap.
 - `src/dompet/parse.js`: Claude reads text, photos, image files and PDF statements into expenses / income / BTC trades
-  / investments / pos changes (structured output). Screenshots are not stored; the Telegram file id is, and
+  / investments / pos changes (structured output). The low-cost model reads first (more effort for images and PDFs);
+  a decline, cut-off or unreadable answer is retried once on the stronger backup model (constants at the top). Screenshots are not stored; the Telegram file id is, and
   `/api/dompet/receipt/<id>` fetches it again from Telegram.
 - `src/dompet/db.js`: tables `dompet_pos`, `dompet_tx`, `dompet_btc`, `dompet_invest`, `dompet_prices` (schema.sql).
   Weeks start Monday, dates are WITA. BTC profit uses average cost.

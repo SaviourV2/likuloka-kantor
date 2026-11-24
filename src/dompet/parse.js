@@ -4,7 +4,10 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { INVEST_KINDS } from './db.js';
 
-const MODEL = 'claude-opus-5-5';
+// Claude Haiku 5.5 reads almost everything (fast, about 40x cheaper than Opus). When it declines, runs out of room or
+// returns something that is not the expected JSON, the same message goes once to Claude Sonnet 5.5.
+const MODEL = 'claude-haiku-5-5';
+const BACKUP_MODEL = 'claude-sonnet-5-5';
 
 const ITEM = {
   type: 'object', additionalProperties: false,
@@ -69,17 +72,28 @@ export async function parseMessage(env, { text, media, today, pos }) {
   else if (media) content.push({ type: 'image', source: { type: 'base64', media_type: media.media_type, data: media.data } });
   const posList = pos.map(p => `- ${p.name} (${p.period})`).join('\n');
   content.push({ type: 'text', text: `Today (WITA): ${today}\nExisting pos:\n${posList}\n\nKevin's message: ${text ? text : media ? '(only the attachment)' : '(empty)'}` });
+  const messages = [{ role: 'user', content }];
+  try {
+    return await readWith(client, MODEL, messages, media ? 'medium' : 'low');
+  } catch (e) {
+    if (!(e instanceof RetryElsewhere)) throw e;
+    console.log('dompet parse: ' + MODEL + ' ' + e.message + ', trying ' + BACKUP_MODEL);
+    return readWith(client, BACKUP_MODEL, messages, 'low');
+  }
+}
+
+/** A result worth trying again on the backup model (decline, cut-off output, unreadable JSON). */
+class RetryElsewhere extends Error {}
+
+async function readWith(client, model, messages, effort) {
+  const backup = model === BACKUP_MODEL;
   let response;
   try {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-      system: SYSTEM,
-      messages: [{ role: 'user', content }],
-    });
+    const params = { model, max_tokens: 16000, output_config: { effort, format: { type: 'json_schema', schema: SCHEMA } }, system: SYSTEM, messages };
+    // Haiku has no server-side fallback (the parameter is rejected); Sonnet gets it as a last resort.
+    response = backup
+      ? await client.beta.messages.create({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
+      : await client.messages.create(params);
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) throw new Error('ANTHROPIC_API_KEY di worker likuloka-kantor tidak valid');
     if (e instanceof Anthropic.RateLimitError) throw new Error('Claude sedang sibuk (rate limit), coba lagi sebentar lagi');
@@ -87,7 +101,12 @@ export async function parseMessage(env, { text, media, today, pos }) {
     if (e instanceof Anthropic.APIError) throw new Error(`Claude API error ${e.status}`);
     throw e;
   }
-  if (response.stop_reason === 'refusal') throw new Error('Claude tidak mau membaca pesan ini');
-  if (response.stop_reason === 'max_tokens') throw new Error('Terlalu banyak transaksi dalam satu pesan; kirim per halaman');
-  return JSON.parse(response.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+  const fail = msg => { throw backup ? new Error(msg) : new RetryElsewhere(response.stop_reason); };
+  if (response.stop_reason === 'refusal') fail('Claude tidak mau membaca pesan ini');
+  if (response.stop_reason === 'max_tokens') fail('Terlalu banyak transaksi dalam satu pesan; kirim per halaman');
+  try {
+    return JSON.parse(response.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+  } catch {
+    return fail('Jawaban Claude tidak bisa dibaca, coba kirim ulang');
+  }
 }
