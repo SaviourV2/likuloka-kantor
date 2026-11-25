@@ -19,8 +19,15 @@ See CLAUDE.md for how it works.
 - Live cards are computed on each request from the main site's tables (read-only).
 
 ## Dompet (kantor.likuloka.com/dompet)
-Personal finance for Kevin: spending sorted into *pos* (categories with a daily / weekly / monthly rhythm and budget),
-income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investments. Filled mostly from Telegram.
+Personal finance for Kevin and Mey: spending sorted into *pos* (categories with a daily / weekly / monthly rhythm and
+budget, each owned by 👥 Bersama, Kevin or Mey), income, Kevin's Bitcoin portfolio, BTC and IHSG prices, and daily
+interest on Kevin's investments. Filled mostly from Telegram; the page is Kevin's only.
+
+**Kevin & Mey**: one bot, three paired chats (Kevin's private chat, Mey's private chat, their group with the bot).
+In the group, spending goes to Bersama pos unless clearly personal; in a private chat to the sender's own pos unless
+it says bersama / berdua. Shared spending recorded in a private chat is announced in the group (or to the partner).
+Both see everything; Bitcoin / investments / portfolio are Kevin's only. A pos of the other person is never used:
+Mey's coffee goes to "Kopi & jajan Mey" if "Kopi & jajan" is Kevin's. Evening recaps go to each private chat.
 
 **Telegram bot, one-time setup** (Kevin types the secrets himself):
 1. Telegram → @BotFather → `/newbot`. A new bot, not the website's briefing bot (a webhook bot cannot also be polled).
@@ -32,8 +39,12 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
 3. Zero Trust → Access → Applications → Add an application → Self-hosted → domain `kantor.likuloka.com`, path
    `tele/dompet` → policy action **Bypass**, include Everyone. Telegram cannot sign in; the worker checks the secret
    header Telegram sends (derived from the bot token) and answers only the paired chat.
-4. kantor.likuloka.com/dompet → tab *Bot Telegram* → *Sambungkan bot* → send the shown `/start 123456` to the bot.
-   The tab shows Telegram's last webhook error if step 3 is missing.
+4. kantor.likuloka.com/dompet → tab *Bot Telegram* → *Sambungkan* for Kevin, then Mey (send her the link), then
+   the group (pair both private chats first). Send the shown `/start 123456`. The tab shows Telegram's last webhook
+   error if step 3 is missing.
+5. For the group: @BotFather → `/setprivacy` → the bot → **Disable** (else the bot only sees commands in groups);
+   remove and re-add the bot to the group afterwards. In the group only messages that look like money (a number, a
+   photo, a question word or @bot) go to Claude; ordinary chat is ignored.
 
 **How it works**
 - `src/dompet/telegram.js`: webhook `/tele/dompet`, pairing, commands (`/hari /minggu /bulan /pos /btc /ihsg /bunga
@@ -42,7 +53,9 @@ income, Bitcoin portfolio, BTC and IHSG prices, and daily interest on investment
   / investments / pos changes (structured output). The low-cost model reads first (more effort for images and PDFs);
   a decline, cut-off or unreadable answer is retried once on the stronger backup model (constants at the top). Screenshots are not stored; the Telegram file id is, and
   `/api/dompet/receipt/<id>` fetches it again from Telegram.
-- `src/dompet/db.js`: tables `dompet_pos`, `dompet_tx`, `dompet_btc`, `dompet_invest`, `dompet_prices` (schema.sql).
+- `src/dompet/db.js`: tables `dompet_pos` (+ `owner`), `dompet_tx` (+ `member`), `dompet_btc`, `dompet_invest`,
+  `dompet_prices` (schema.sql). Columns added after the first release are added at runtime by `ensureSchema`
+  (D1 has no ADD COLUMN IF NOT EXISTS). Old pos belong to Kevin until changed on the page.
   Weeks start Monday, dates are WITA. BTC profit uses average cost.
 - `src/dompet/invest.js`: interest per day = rate ÷ 365 on the principal (simple), or compounded daily / monthly,
   minus tax on interest; stops at maturity or when marked withdrawn (*cairkan*).

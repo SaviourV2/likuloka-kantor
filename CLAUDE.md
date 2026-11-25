@@ -12,15 +12,18 @@ Kevin's office of Claude desks (mochi slimes) and the Villa & Kahuna desk. Its o
   `villa_sync`, and the tables in `schema.sql` (`villa_bookings`, `villa_payouts`). Never change the main site's tables
   from here.
 - Villa bookings / payouts come from Bukit Vista's emails, written by the routine "Liku Loka update harian" (step D).
-- Dompet (`/dompet`, `src/dompet/`): Kevin's personal finance. Telegram bot (secret `DOMPET_BOT_TOKEN`, webhook
-  `/tele/dompet` outside Access, secret header + paired chat), Claude reads screenshots (`ANTHROPIC_API_KEY`),
-  tables `dompet_*`, ops_settings `dompet_telegram` / `dompet_market`, cron 21:00 WITA recap. Details in README.
+- Dompet (`/dompet`, `src/dompet/`): personal finance of Kevin and Mey. One Telegram bot (secret `DOMPET_BOT_TOKEN`,
+  webhook `/tele/dompet` outside Access, secret header + paired chats: Kevin, Mey, their shared group), Claude reads
+  screenshots (`ANTHROPIC_API_KEY`), tables `dompet_*` (pos owner: bersama / kevin / mey), ops_settings `dompet_telegram`
+  / `dompet_market`, cron 21:00 WITA recap. Details in README.
 - Every push to `main` deploys via `.github/workflows/deploy.yml` (secrets CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID).
 
 ## Rules (from Kevin, always apply)
 - The repo stays private. Never commit secrets. Kevin types tokens and passwords himself.
 - Only kevinpersonalemail30@gmail.com may open the Kantor; money (payouts, booking values) stays here.
 - Villa bookings never go into the website's agenda.
-- Dompet data (Kevin's own money) stays in this repo's worker and Kevin's own Telegram chat; never on likuloka.com.
+- Dompet data stays in this repo's worker and in Kevin's and Mey's Telegram chats (private + their shared group);
+  never on likuloka.com. Mey uses Telegram only; the /dompet page stays Kevin's. Kevin and Mey see each other's spending;
+  Bitcoin, investments and the portfolio are Kevin's only. Shared spending is one pot (no split of who owes whom).
 - Times are WITA (Asia/Makassar, UTC+8).
 - Reply to Kevin in Indonesian; code comments and docs in English.

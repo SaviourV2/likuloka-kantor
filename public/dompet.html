@@ -75,6 +75,9 @@ section.tab.show{display:flex}
 .meter{height:8px;border-radius:999px;background:var(--grid);overflow:hidden;margin-top:4px}
 .meter i{display:block;height:100%;border-radius:999px;background:var(--series)}
 .meter.warn i{background:var(--bell)} .meter.over i{background:var(--alert)}
+.badge{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;font-weight:500}
+.badge.shared{color:var(--series);border-color:var(--series)}
+#owner-bar[hidden]{display:none}
 .flag{font-size:12px} .flag.warn{color:var(--bell)} .flag.over{color:var(--alert)}
 /* lists */
 .daygroup{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
@@ -133,6 +136,12 @@ code{font-size:12.5px;background:var(--card);border:1px solid var(--line);border
     <button role="tab" data-tab="investasi" aria-selected="false">Investasi</button>
     <button role="tab" data-tab="bot" aria-selected="false">Bot Telegram</button>
   </nav>
+  <div class="row" id="owner-bar" style="justify-content:flex-start">
+    <span class="small muted">Lihat</span>
+    <div class="seg" id="owner-seg" role="group" aria-label="Milik siapa">
+      <button data-o="all" aria-pressed="true">Semua</button><button data-o="bersama" aria-pressed="false">👥 Bersama</button><button data-o="kevin" aria-pressed="false">Kevin</button><button data-o="mey" aria-pressed="false">Mey</button>
+    </div>
+  </div>
 
   <!-- Ringkasan -->
   <section class="tab show" id="tab-ringkasan">
@@ -196,12 +205,13 @@ code{font-size:12.5px;background:var(--card);border:1px solid var(--line);border
         <input type="hidden" name="id">
         <label>Emoji<input name="emoji" maxlength="8" placeholder="☕"></label>
         <label>Nama pos<input name="name" required placeholder="Kopi"></label>
+        <label>Milik<select name="owner"><option value="bersama">👥 Bersama</option><option value="kevin" selected>Kevin</option><option value="mey">Mey</option></select></label>
         <label>Ritme<select name="period"><option value="daily">Harian</option><option value="weekly">Mingguan</option><option value="monthly" selected>Bulanan</option></select></label>
         <label>Budget per periode (Rp)<input name="budget" inputmode="numeric" placeholder="kosong = tanpa budget"></label>
         <button class="btn" type="submit">Simpan pos</button>
         <button class="btn ghost" type="button" id="pos-cancel" hidden>Batal</button>
       </form>
-      <p class="note">Ritme menentukan budget dan grup: <b>harian</b> (makan, kopi, transport), <b>mingguan</b> (belanja dapur, hiburan), <b>bulanan</b> (tagihan, sewa, langganan). Bot memilih pos otomatis dan membuat pos baru bila perlu.</p>
+      <p class="note">Ritme menentukan budget dan grup: <b>harian</b> (makan, kopi, transport), <b>mingguan</b> (belanja dapur, hiburan), <b>bulanan</b> (tagihan, sewa, langganan). Bot memilih pos otomatis dan membuat pos baru bila perlu. <b>Milik</b>: pos 👥 Bersama untuk pengeluaran berdua (belanja dapur, sewa, listrik), atau pos pribadi Kevin / Mey. Pesan di grup Telegram masuk pos Bersama.</p>
     </div>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))" id="pos-columns"></div>
   </section>
@@ -286,7 +296,10 @@ const tgl = d => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]}
 const dayName = d => DAYS[new Date(d + 'T00:00:00Z').getUTCDay()];
 const PER = { daily: 'Harian', weekly: 'Mingguan', monthly: 'Bulanan' };
 const num = v => Number(String(v || '').replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')) || 0;
-let D = null, seriesMode = 'daily', rangeMode = 'month', txShown = 40;
+let D = null, seriesMode = 'daily', rangeMode = 'month', txShown = 40, ownerMode = 'all';
+const OWN = { bersama: '👥 Bersama', kevin: 'Kevin', mey: 'Mey' };
+const ownBadge = o => `<span class="badge${o === 'bersama' ? ' shared' : ''}">${OWN[o] || esc(o)}</span>`;
+const ownOk = o => ownerMode === 'all' || o === ownerMode;
 
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 2600); }
 async function post(body) {
@@ -369,20 +382,20 @@ function meter(p) {
 }
 
 function renderSummary() {
-  const t = D.totals, b = D.btc, m = D.market, inv = D.invest;
+  const t = ownerMode === 'all' ? D.totals : D.totals.by_owner[ownerMode], b = D.btc, m = D.market, inv = D.invest;
   const vsLast = t.last_month_same_day ? (t.month - t.last_month_same_day) / t.last_month_same_day * 100 : null;
   $('#tiles').innerHTML = [
     tile('Hari ini', rp(t.today), t.yesterday ? `kemarin ${rp(t.yesterday)}` : ''),
     tile('Minggu ini', rp(t.week), 'sejak Senin'),
     tile('Bulan ini', rp(t.month), vsLast != null ? `<span class="${vsLast <= 0 ? 'up' : 'down'}">${pct(vsLast, 0)}</span> vs bulan lalu di tgl yang sama` : ''),
     tile('Pemasukan bulan ini', rp(t.income_month), t.income_month ? `selisih ${rp(t.income_month - t.month)}` : ''),
-    tile('Portofolio', rp(D.porto_total) + (D.porto_partial ? '*' : ''), `${D.porto_partial ? '* tanpa BTC (harga belum ada) · ' : ''}BTC ${b.value != null ? rp(b.value) : '–'} · investasi ${rp(inv.value)}`),
+    ...(ownerMode === 'all' || ownerMode === 'kevin' ? [tile('Portofolio Kevin', rp(D.porto_total) + (D.porto_partial ? '*' : ''), `${D.porto_partial ? '* tanpa BTC (harga belum ada) · ' : ''}BTC ${b.value != null ? rp(b.value) : '–'} · investasi ${rp(inv.value)}`)] : []),
   ].join('');
   renderSeries();
-  const withBudget = D.pos.filter(p => !p.archived && p.budget);
+  const withBudget = D.pos.filter(p => !p.archived && p.budget && ownOk(p.owner));
   $('#budget-summary').innerHTML = withBudget.length ? ['daily', 'weekly', 'monthly'].map(per => {
     const list = withBudget.filter(p => p.period === per); if (!list.length) return '';
-    return `<h3>${PER[per]}</h3>` + list.map(p => `<div class="pos-item"><div class="top"><span>${esc(p.emoji || '')} ${esc(p.name)}</span></div>${meter(p)}</div>`).join('');
+    return `<h3>${PER[per]}</h3>` + list.map(p => `<div class="pos-item"><div class="top"><span>${esc(p.emoji || '')} ${esc(p.name)}</span>${ownBadge(p.owner)}</div>${meter(p)}</div>`).join('');
   }).join('') : '<p class="empty">Belum ada budget. Atur di tab <b>Pos & budget</b>, atau tulis ke bot "budget makan 150rb sehari".</p>';
   $('#market-tiles').innerHTML = [
     tile('Bitcoin', m.btc ? rp(m.btc.idr) : '–', m.btc?.change_24h != null ? `<span class="${m.btc.change_24h >= 0 ? 'up' : 'down'}">${pct(m.btc.change_24h)}</span> 24 jam` : (m.errors.btc || '')),
@@ -396,11 +409,13 @@ function renderSeries() {
   const arr = D.series[seriesMode], today = D.today;
   const label = d => seriesMode === 'daily' ? String(Number(d.key.slice(8))) : seriesMode === 'weekly' ? tgl(d.key) : MONTHS[Number(d.key.slice(5, 7)) - 1];
   const name = d => seriesMode === 'daily' ? `${dayName(d.key)} ${tgl(d.key)}` : seriesMode === 'weekly' ? `Minggu ${tgl(d.key)}` : `${MONTHS[Number(d.key.slice(5, 7)) - 1]} ${d.key.slice(0, 4)}`;
-  const data = arr.map(d => ({ ...d, value: d.amount, label: label(d), dim: seriesMode === 'daily' && d.key > today }));
+  const val = d => ownerMode === 'all' ? d.amount : (d.by_owner[ownerMode] || 0);
+  const data = arr.map(d => ({ ...d, value: val(d), label: label(d), dim: seriesMode === 'daily' && d.key > today }));
   barChart($('#spend-chart'), data, { labelEvery: seriesMode === 'daily' ? 5 : seriesMode === 'weekly' ? 2 : 1,
-    tipFor: d => { const top = Object.entries(d.by_pos).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, v]) => { const p = posById(Number(id)); return `${esc(p?.emoji || '•')} ${esc(p?.name || 'Tanpa pos')}: ${rp(v)}`; });
-      return `${name(d)}<br><b>${rupiah(d.amount)}</b>${top.length ? '<br>' + top.join('<br>') : ''}`; } });
-  const done = seriesMode === 'daily' ? arr : arr.slice(0, -1), avg = done.length ? done.reduce((s, d) => s + d.amount, 0) / done.length : 0;
+    tipFor: d => { const top = Object.entries(d.by_pos).filter(([id]) => ownOk(posById(Number(id))?.owner)).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([id, v]) => { const p = posById(Number(id)); return `${esc(p?.emoji || '•')} ${esc(p?.name || 'Tanpa pos')}: ${rp(v)}`; });
+      const split = ownerMode === 'all' ? Object.entries(d.by_owner).filter(([, v]) => v).map(([o, v]) => `${OWN[o] || o} ${rp(v)}`).join(' · ') : '';
+      return `${name(d)}<br><b>${rupiah(d.value)}</b>${split.includes('·') ? '<br>' + split : ''}${top.length ? '<br>' + top.join('<br>') : ''}`; } });
+  const done = seriesMode === 'daily' ? data : data.slice(0, -1), avg = done.length ? done.reduce((s, d) => s + d.value, 0) / done.length : 0;
   $('#spend-note').textContent = `Rata-rata ${rp(avg)} per ${seriesMode === 'daily' ? 'hari (31 hari)' : seriesMode === 'weekly' ? 'minggu (11 minggu penuh)' : 'bulan (11 bulan penuh)'}${seriesMode === 'daily' ? '' : ' · batang terakhir = periode berjalan'}.`;
 }
 
@@ -410,27 +425,27 @@ function rangeFrom(r) {
   return t.slice(0, 8) + '01';
 }
 function renderTx() {
-  const opts = D.pos.filter(p => !p.archived).map(p => `<option value="${p.id}">${esc(p.emoji || '')} ${esc(p.name)} · ${PER[p.period].toLowerCase()}</option>`).join('');
+  const opts = D.pos.filter(p => !p.archived).map(p => `<option value="${p.id}">${esc(p.emoji || '')} ${esc(p.name)} · ${OWN[p.owner] || ''} · ${PER[p.period].toLowerCase()}</option>`).join('');
   const keep = $('#tx-pos').value; $('#tx-pos').innerHTML = opts; if (keep) $('#tx-pos').value = keep;
   const fk = $('#tx-filter').value; $('#tx-filter').innerHTML = '<option value="">Semua</option>' + opts; $('#tx-filter').value = fk;
   // per-pos breakdown for the chosen range
-  const from = rangeFrom(rangeMode), list = D.tx.filter(x => x.kind === 'expense' && x.date >= from && x.date <= D.today);
+  const from = rangeFrom(rangeMode), list = D.tx.filter(x => x.kind === 'expense' && x.date >= from && x.date <= D.today && ownOk(x.owner));
   const by = new Map(); for (const x of list) by.set(x.pos_id, (by.get(x.pos_id) || 0) + x.amount);
   const total = list.reduce((s, x) => s + x.amount, 0), rows = [...by].sort((a, b) => b[1] - a[1]), mx = rows[0]?.[1] || 1;
   $('#range-breakdown').innerHTML = rows.length ? `<div class="row"><b class="num">${rupiah(total)}</b><span class="small muted">${list.length} transaksi</span></div>` + rows.map(([id, v]) => {
     const p = posById(id); return `<div class="pos-item"><div class="top"><span>${esc(p?.emoji || '•')} ${esc(p?.name || 'Tanpa pos')}</span><span class="num">${rp(v)} · ${Math.round(v / total * 100)}%</span></div><div class="meter"><i style="width:${v / mx * 100}%"></i></div></div>`;
   }).join('') : '<p class="empty">Belum ada pengeluaran di rentang ini.</p>';
   // list grouped by day
-  const matching = D.tx.filter(x => !fk || String(x.pos_id) === fk), shown = matching.slice(0, txShown), days = new Map();
+  const matching = D.tx.filter(x => (!fk || String(x.pos_id) === fk) && ownOk(x.owner)), shown = matching.slice(0, txShown), days = new Map();
   for (const x of shown) (days.get(x.date) || days.set(x.date, []).get(x.date)).push(x);
-  const posSel = x => `<select data-pos="${x.id}" aria-label="Pos">${D.pos.filter(p => !p.archived || p.id === x.pos_id).map(p => `<option value="${p.id}"${p.id === x.pos_id ? ' selected' : ''}>${esc(p.emoji || '')} ${esc(p.name)}</option>`).join('')}</select>`;
+  const posSel = x => `<select data-pos="${x.id}" aria-label="Pos">${D.pos.filter(p => !p.archived || p.id === x.pos_id).map(p => `<option value="${p.id}"${p.id === x.pos_id ? ' selected' : ''}>${esc(p.emoji || '')} ${esc(p.name)}${p.owner === 'bersama' ? ' 👥' : ''}</option>`).join('')}</select>`;
   $('#tx-list').innerHTML = shown.length ? [...days].map(([d, xs]) => {
     const out = xs.filter(x => x.kind === 'expense').reduce((s, x) => s + x.amount, 0);
     return `<div class="daygroup"><div class="dayhead"><span>${dayName(d)} ${tgl(d)}</span><span class="num">${out ? '−' + rp(out) : ''}</span></div>` + xs.map(x => `
       <div class="txrow ${x.kind}">
         <div class="em" aria-hidden="true">${x.kind === 'income' ? '💰' : esc(x.pos_emoji || '•')}</div>
         <div class="what"><div class="t">${esc(x.merchant || x.note || x.pos_name || (x.kind === 'income' ? 'Pemasukan' : 'Pengeluaran'))}</div>
-          <div class="m">${x.kind === 'expense' ? posSel(x) : '<span>Pemasukan</span>'}${x.merchant && x.note ? `<span>${esc(x.note)}</span>` : ''}${x.account ? `<span>${esc(x.account)}</span>` : ''}
+          <div class="m">${x.kind === 'expense' ? posSel(x) : '<span>Pemasukan</span>'}${ownBadge(x.owner)}${(x.member && x.member !== 'kevin') || x.owner === 'bersama' ? `<span>oleh ${OWN[x.member] || 'Kevin'}</span>` : ''}${x.merchant && x.note ? `<span>${esc(x.note)}</span>` : ''}${x.account ? `<span>${esc(x.account)}</span>` : ''}
             ${x.has_receipt ? `<a class="linkbtn" href="/api/dompet/receipt/${x.id}" target="_blank" rel="noopener">bukti</a>` : ''}<button class="linkbtn danger" data-del="${x.id}">hapus</button></div></div>
         <div class="amt num"><b>${x.kind === 'income' ? '+' : '−'}${rupiah(x.amount)}</b></div>
       </div>`).join('') + '</div>';
@@ -440,8 +455,8 @@ function renderTx() {
 
 function renderPos() {
   $('#pos-columns').innerHTML = ['daily', 'weekly', 'monthly'].map(per => {
-    const list = D.pos.filter(p => p.period === per && !p.archived);
-    return `<div class="card"><h2>${PER[per]}</h2><div class="pos-list">${list.map(p => `<div class="pos-item"><div class="top"><span>${esc(p.emoji || '')} ${esc(p.name)}</span>
+    const list = D.pos.filter(p => p.period === per && !p.archived && ownOk(p.owner));
+    return `<div class="card"><h2>${PER[per]}</h2><div class="pos-list">${list.map(p => `<div class="pos-item"><div class="top"><span>${esc(p.emoji || '')} ${esc(p.name)} ${ownBadge(p.owner)}</span>
       <span><button class="linkbtn" data-edit-pos="${p.id}">ubah</button> · <button class="linkbtn danger" data-del-pos="${p.id}">hapus</button></span></div>${meter(p)}</div>`).join('') || '<p class="empty">Belum ada.</p>'}</div></div>`;
   }).join('') + (D.pos.some(p => p.archived) ? `<div class="card"><h2>Diarsipkan</h2><p class="note">${D.pos.filter(p => p.archived).map(p => `${esc(p.emoji || '')} ${esc(p.name)} <button class="linkbtn" data-unarchive="${p.id}">aktifkan</button>`).join(' · ')}</p></div>` : '');
 }
@@ -486,37 +501,49 @@ function renderInvest() {
 }
 
 function renderBot() {
-  const b = D.bot || {}, chip = $('#bot-chip');
-  const ok = b.chat && !b.webhook?.error;
-  chip.textContent = b.chat ? (b.webhook?.error ? '⚠️ Bot: webhook error' : `Bot @${b.bot?.username} tersambung`) : 'Bot belum tersambung';
-  chip.className = 'chip ' + (ok ? 'on' : 'warn');
-  const L = [`<h2>Bot Telegram</h2>`];
+  const b = D.bot || {}, chats = b.chats || {}, chip = $('#bot-chip'), bot = b.bot?.username;
+  const keys = ['kevin', 'mey', 'group'], n = keys.filter(k => chats[k]).length;
+  chip.textContent = !n ? 'Bot belum tersambung' : b.webhook?.error ? '⚠️ Bot: webhook error' : `Bot @${bot} · ${n}/3 chat`;
+  chip.className = 'chip ' + (n && !b.webhook?.error ? 'on' : 'warn');
+  const WHO = { kevin: 'Kevin · chat pribadi', mey: 'Mey · chat pribadi', group: 'Grup bersama · Kevin, Mey & bot' };
+  const L = ['<h2>Bot Telegram</h2>'];
   if (b.error) L.push(`<p class="err">${esc(b.error)}</p>`);
-  if (b.chat) {
-    L.push(`<p>✅ Tersambung ke <b>${esc(b.chat.name || '')}</b>${b.chat.username ? ' (@' + esc(b.chat.username) + ')' : ''} lewat <b>@${esc(b.bot?.username || '')}</b>.</p>`);
-    if (b.webhook?.error) L.push(`<p class="err">Telegram tidak bisa mengirim ke Kantor: ${esc(b.webhook.error)}${b.webhook.error_at ? ' (' + new Date(b.webhook.error_at).toLocaleString('id-ID') + ')' : ''}. Biasanya karena Cloudflare Access belum punya aturan Bypass untuk <code>/tele/dompet</code> (langkah 3).</p>`);
-    L.push(`<div class="row" style="justify-content:flex-start;margin-top:10px">
-      <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--fg)"><input type="checkbox" id="recap-on" style="width:auto"${b.recap ? ' checked' : ''}> Rekap otomatis tiap malam 21:00 WITA</label>
-      <button class="btn ghost" id="bot-test">Kirim rekap sekarang</button><button class="btn ghost" id="bot-setup">Pasang ulang webhook</button><button class="btn ghost" id="bot-unpair">Putuskan chat</button></div>`);
-    if (b.last_recap) L.push(`<p class="note">Rekap terakhir: ${tgl(b.last_recap)}.</p>`);
-  } else {
-    L.push(`<p>Bot pribadi untuk mencatat pengeluaran dari Telegram: kirim teks, screenshot struk / mutasi / e-wallet, atau PDF e-statement. Claude membaca dan memasukkannya ke pos yang cocok.</p>
-    <ol class="steps">
-      <li>Di Telegram, buka <b>@BotFather</b> → <code>/newbot</code> → beri nama (mis. "Dompet Kevin"). Salin token-nya. Pakai bot baru, bukan bot briefing website.</li>
-      <li>Cloudflare → Workers & Pages → <b>likuloka-kantor</b> → Settings → Variables and Secrets → tambah <b>Secret</b> <code>DOMPET_BOT_TOKEN</code> (token tadi) dan <code>ANTHROPIC_API_KEY</code> (sama dengan website). Kevin mengetik sendiri.
+  if (b.webhook?.error) L.push(`<p class="err">Telegram tidak bisa mengirim ke Kantor: ${esc(b.webhook.error)}${b.webhook.error_at ? ' (' + new Date(b.webhook.error_at).toLocaleString('id-ID') + ')' : ''}. Biasanya karena Cloudflare Access belum punya aturan Bypass untuk <code>/tele/dompet</code>.</p>`);
+  L.push(`<p class="note">Satu bot untuk Kevin dan Mey. Di chat pribadi, pengeluaran masuk pos sendiri (kecuali ditulis "bersama"); di grup, masuk pos 👥 Bersama. Keduanya bisa melihat semua catatan; Bitcoin, investasi dan portofolio khusus Kevin. Halaman ini tetap hanya untuk Kevin.</p>`);
+  const pairBlock = k => {
+    if (!b.pair || b.pair.who !== k) return '';
+    const link = k === 'group' ? `https://t.me/${esc(bot)}?startgroup=${esc(b.pair.code)}` : `https://t.me/${esc(bot)}?start=${esc(b.pair.code)}`;
+    const how = k === 'group' ? `Ketuk <a href="${link}" target="_blank" rel="noopener">link ini</a> dari HP Kevin dan pilih grup bersama Mey (bot ikut masuk grup), atau kirim di grup:`
+      : k === 'mey' ? `Kirim <a href="${link}" target="_blank" rel="noopener">link ini</a> ke Mey dan minta Mey mengetuknya, atau Mey mengirim ke <b>@${esc(bot)}</b>:`
+      : `Ketuk <a href="${link}" target="_blank" rel="noopener">link ini</a> dari HP, atau kirim ke <b>@${esc(bot)}</b>:`;
+    return `<p class="small" style="margin:8px 0 0">${how}</p><p class="code" style="margin:4px 0">/start ${esc(b.pair.code)}</p>
+      <p class="note">Berlaku sampai ${new Date(b.pair.until).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}. Muat ulang halaman ini setelahnya.</p>`;
+  };
+  L.push('<div class="pos-list">' + keys.map(k => {
+    const c = chats[k];
+    const who = c ? `✅ ${esc(c.name || c.title || '')}${c.username ? ' (@' + esc(c.username) + ')' : ''}${c.last_recap ? ' · rekap terakhir ' + tgl(c.last_recap) : ''}` : 'Belum tersambung';
+    const needs = k === 'group' && !c && (!chats.kevin || !chats.mey) ? '<div class="small muted">Sambungkan chat pribadi Kevin dan Mey dulu, supaya bot tahu siapa yang mengirim di grup.</div>' : '';
+    const privacy = k === 'group' && c && b.bot && b.bot.reads_groups === false
+      ? '<div class="err">⚠️ Bot belum bisa membaca pesan biasa di grup. Di @BotFather: <code>/setprivacy</code> → pilih bot → <b>Disable</b>, lalu keluarkan bot dari grup dan masukkan lagi.</div>' : '';
+    return `<div class="pos-item"><div class="top"><span><b>${WHO[k]}</b></span>
+      <span>${c ? `<button class="linkbtn danger" data-unpair="${k}">putuskan</button>` : `<button class="btn ghost" data-pair="${k}"${b.token ? '' : ' disabled'}>Sambungkan</button>`}</span></div>
+      <div class="small muted">${who}</div>${needs}${privacy}${pairBlock(k)}</div>`;
+  }).join('') + '</div>');
+  if (n) L.push(`<div class="row" style="justify-content:flex-start;margin-top:14px">
+      <label style="flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--fg)"><input type="checkbox" id="recap-on" style="width:auto"${b.recap ? ' checked' : ''}> Rekap tiap malam 21:00 WITA (ke chat pribadi Kevin dan Mey)</label>
+      <button class="btn ghost" id="bot-test"${chats.kevin ? '' : ' disabled'}>Kirim rekap Kevin sekarang</button><button class="btn ghost" id="bot-webhook">Pasang ulang webhook</button></div>`);
+  L.push(`<details style="margin-top:14px"${n ? '' : ' open'}><summary class="small">Pemasangan awal</summary><ol class="steps">
+      <li>Di Telegram, buka <b>@BotFather</b> → <code>/newbot</code> → beri nama (mis. "Dompet Kevin & Mey"). Salin token-nya. Pakai bot baru, bukan bot briefing website. Untuk grup: <code>/setprivacy</code> → <b>Disable</b>.</li>
+      <li>Cloudflare → Workers & Pages → <b>likuloka-kantor</b> → Settings → Variables and Secrets → <b>Secret</b> <code>DOMPET_BOT_TOKEN</code> dan <code>ANTHROPIC_API_KEY</code>. Kevin mengetik sendiri.
         ${b.token ? '✅ token terbaca' : '⏳ token belum terbaca'} · ${b.claude ? '✅ Claude siap' : '⏳ ANTHROPIC_API_KEY belum terbaca'}</li>
-      <li>Cloudflare Zero Trust → Access → Applications → <b>Add an application</b> → Self-hosted → domain <code>kantor.likuloka.com</code>, path <code>tele/dompet</code> → policy action <b>Bypass</b>, include <b>Everyone</b>. (Pesan Telegram tetap diperiksa dengan kunci rahasia dan hanya chat Kevin yang dijawab.)</li>
-      <li>Tekan tombol di bawah, lalu kirim kode yang muncul ke bot.</li>
-    </ol>
-    <div class="row" style="justify-content:flex-start;margin-top:10px"><button class="btn" id="bot-setup"${b.token ? '' : ' disabled'}>Sambungkan bot</button></div>`);
-    if (b.pair) L.push(`<p style="margin-top:12px">Kirim ke <a href="https://t.me/${esc(b.bot?.username)}?start=${esc(b.pair.code)}" target="_blank" rel="noopener"><b>@${esc(b.bot?.username)}</b></a>:</p>
-      <p class="code">/start ${esc(b.pair.code)}</p><p class="note">Berlaku sampai ${new Date(b.pair.until).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}. Atau ketuk link di atas dari HP. Muat ulang halaman ini setelahnya.</p>`);
-    if (b.webhook?.error) L.push(`<p class="err">Webhook: ${esc(b.webhook.error)}</p>`);
-  }
+      <li>Cloudflare Zero Trust → Access → Applications → Self-hosted → <code>kantor.likuloka.com</code> path <code>tele/dompet</code> → policy <b>Bypass</b>, include <b>Everyone</b>.</li>
+      <li>Tekan <b>Sambungkan</b> untuk Kevin, lalu Mey, lalu grup, dan kirim kode yang muncul.</li></ol></details>`);
   $('#bot-card').innerHTML = L.join('');
-  $('#bot-setup')?.addEventListener('click', e => { e.target.disabled = true; act({ action: 'bot_setup' }, 'Webhook dipasang').finally(() => { e.target.disabled = false; }); });
-  $('#bot-unpair')?.addEventListener('click', () => confirm('Putuskan chat Telegram dari Dompet?') && act({ action: 'bot_unpair' }, 'Chat diputus'));
-  $('#bot-test')?.addEventListener('click', () => act({ action: 'bot_test' }, 'Rekap dikirim ke Telegram'));
+  $$('#bot-card [data-pair]').forEach(x => x.addEventListener('click', e => { e.target.disabled = true;
+    act({ action: 'bot_setup', who: x.dataset.pair }, 'Kode dibuat').finally(() => { e.target.disabled = false; }); }));
+  $('#bot-webhook')?.addEventListener('click', e => { e.target.disabled = true; act({ action: 'bot_webhook' }, 'Webhook dipasang ulang').finally(() => { e.target.disabled = false; }); });
+  $$('#bot-card [data-unpair]').forEach(x => x.addEventListener('click', () => confirm(`Putuskan ${WHO[x.dataset.unpair]} dari Dompet?`) && act({ action: 'bot_unpair', who: x.dataset.unpair }, 'Diputus')));
+  $('#bot-test')?.addEventListener('click', () => act({ action: 'bot_test' }, 'Rekap dikirim ke Telegram Kevin'));
   $('#recap-on')?.addEventListener('change', e => act({ action: 'bot_recap', on: e.target.checked }, e.target.checked ? 'Rekap malam aktif' : 'Rekap malam mati'));
 }
 
@@ -536,6 +563,7 @@ function setTab(name) {
   hideTip();
   $$('nav.tabs button').forEach(b => { b.setAttribute('aria-selected', String(b.dataset.tab === name)); if (b.dataset.tab === name) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
   $$('section.tab').forEach(s => s.classList.toggle('show', s.id === 'tab-' + name));
+  $('#owner-bar').hidden = !['ringkasan', 'transaksi', 'pos'].includes(name);
   try { history.replaceState(null, '', '#' + name); } catch {}
   if (D) render(); // charts measure their width when visible
 }
@@ -543,6 +571,9 @@ $$('nav.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.da
 $('#series-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; seriesMode = b.dataset.s; $$('#series-seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderSeries(); });
 $('#range-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; rangeMode = b.dataset.r; $$('#range-seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderTx(); });
 $('#tx-filter').addEventListener('change', () => { txShown = 40; renderTx(); });
+$('#owner-seg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; ownerMode = b.dataset.o; txShown = 40;
+  $$('#owner-seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); try { localStorage.setItem('dompet-owner', ownerMode); } catch {} renderSummary(); renderTx(); renderPos(); });
+try { const o = localStorage.getItem('dompet-owner'); if (o && (o === 'all' || OWN[o])) { ownerMode = o; $$('#owner-seg button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.o === o))); } } catch {}
 const formData = f => Object.fromEntries(new FormData(f).entries());
 $('#tx-form').addEventListener('submit', async e => { e.preventDefault(); const d = formData(e.target); d.amount = num(d.amount);
   const r = await act({ action: 'tx_add', ...d }, 'Tersimpan'); if (r?.duplicate_of) toast(`Tersimpan · mirip transaksi #${r.duplicate_of}`); e.target.amount.value = ''; e.target.merchant.value = ''; e.target.note.value = ''; });
@@ -550,7 +581,7 @@ $('#tx-list').addEventListener('change', e => { const s = e.target.closest('sele
 $('#tx-list').addEventListener('click', e => { if (e.target.id === 'tx-more') { txShown += 60; renderTx(); return; } const b = e.target.closest('[data-del]'); if (b && confirm('Hapus transaksi ini?')) act({ action: 'tx_delete', id: b.dataset.del }, 'Dihapus'); });
 
 const posForm = $('#pos-form');
-function editPos(p) { posForm.id.value = p?.id || ''; posForm.emoji.value = p?.emoji || ''; posForm.name.value = p?.name || ''; posForm.period.value = p?.period || 'monthly'; posForm.budget.value = p?.budget || '';
+function editPos(p) { posForm.id.value = p?.id || ''; posForm.emoji.value = p?.emoji || ''; posForm.name.value = p?.name || ''; posForm.period.value = p?.period || 'monthly'; posForm.budget.value = p?.budget || ''; posForm.owner.value = p?.owner || (ownerMode === 'all' ? 'kevin' : ownerMode);
   $('#pos-form-title').textContent = p ? 'Ubah pos' : 'Pos baru'; $('#pos-cancel').hidden = !p; if (p) posForm.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 posForm.addEventListener('submit', async e => { e.preventDefault(); const d = formData(posForm); d.budget = num(d.budget); await act({ action: 'pos_save', ...d }, 'Pos disimpan'); editPos(null); });
 $('#pos-cancel').addEventListener('click', () => editPos(null));

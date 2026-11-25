@@ -1,6 +1,6 @@
-// Reads what Kevin sends the Dompet bot (a sentence, a screenshot of a receipt / bank mutation / e-wallet history /
+// Reads what Kevin or Mey send the Dompet bot (a sentence, a screenshot of a receipt / bank mutation / e-wallet history /
 // exchange trade, or a PDF statement) with Claude and turns it into records: expenses and income sorted into pos,
-// Bitcoin buys / sells, investments, new pos, or a question about his money.
+// Bitcoin buys / sells, investments, new pos, or a question about their money. Kevin and Mey share the bot.
 import Anthropic from '@anthropic-ai/sdk';
 import { INVEST_KINDS } from './db.js';
 
@@ -11,7 +11,7 @@ const BACKUP_MODEL = 'claude-sonnet-5-5';
 
 const ITEM = {
   type: 'object', additionalProperties: false,
-  required: ['type', 'date', 'amount', 'pos', 'pos_is_new', 'pos_period', 'pos_emoji', 'merchant', 'note', 'account',
+  required: ['type', 'date', 'amount', 'pos', 'pos_is_new', 'pos_period', 'pos_emoji', 'pos_owner', 'merchant', 'note', 'account',
     'btc', 'rate_pa', 'compounding', 'tax_pct', 'end_date', 'invest_kind'],
   properties: {
     type: { type: 'string', enum: ['expense', 'income', 'btc_buy', 'btc_sell', 'investment', 'pos'],
@@ -22,6 +22,7 @@ const ITEM = {
     pos_is_new: { type: 'boolean', description: 'True only when `pos` is not one of the existing pos.' },
     pos_period: { type: 'string', enum: ['daily', 'weekly', 'monthly'], description: 'Rhythm of this kind of spending: daily (food, coffee, ride-hailing), weekly (groceries, outings), monthly (bills, rent, subscriptions, big purchases). For an existing pos, its own period.' },
     pos_emoji: { type: 'string', description: 'One emoji for a new pos, else empty.' },
+    pos_owner: { type: 'string', enum: ['bersama', 'self'], description: 'Whose spending this is: bersama = shared spending of Kevin and Mey (a Bersama pos), self = only the sender\'s own (a pos of the sender). For an existing pos, its owner.' },
     merchant: { type: 'string', description: 'Shop, payee, payer or exchange, as written. Empty if none.' },
     note: { type: 'string', description: 'Short Indonesian note (what was bought, items, or why). Empty if nothing useful.' },
     account: { type: 'string', description: 'Paid from / received into: BCA, Mandiri, BRI, Jago, GoPay, OVO, DANA, ShopeePay, cash, credit card ... Empty if unknown.' },
@@ -39,39 +40,47 @@ const SCHEMA = {
   properties: {
     items: { type: 'array', items: ITEM, description: 'Everything to record, in order. Empty when the message is only a question or nothing can be read.' },
     query: { type: 'string', enum: ['none', 'today', 'week', 'month', 'pos', 'btc', 'ihsg', 'invest', 'porto', 'help'],
-      description: 'When Kevin asks about his money instead of (or as well as) recording: today = spending today, week, month, pos = budgets per pos, btc = Bitcoin price and holdings, ihsg = IHSG index, invest = interest on investments, porto = everything he owns, help = how to use the bot. none otherwise.' },
+      description: 'When the sender asks about money instead of (or as well as) recording: today = spending today, week, month, pos = budgets per pos, btc = Bitcoin price and holdings, ihsg = IHSG index, invest = interest on investments, porto = everything Kevin owns, help = how to use the bot. none otherwise.' },
     skipped: { type: 'string', description: 'Short Indonesian note on lines deliberately not recorded (e.g. transfer between own accounts, e-wallet top-up, card bill payment, foreign currency). Empty if none.' },
-    reply: { type: 'string', description: 'Only when something needs Kevin: a short Indonesian question or explanation (unreadable image, missing amount). Empty otherwise.' },
+    reply: { type: 'string', description: 'Only when something needs the sender: a short Indonesian question or explanation (unreadable image, missing amount). Empty otherwise.' },
   },
 };
 
-const SYSTEM = `You are the bookkeeper behind Kevin's personal finance bot on Telegram. Kevin lives in Bali; amounts are Indonesian rupiah.
-Read his message (a sentence, a screenshot, a photo of a receipt, or a PDF statement) and return what to record.
+const SYSTEM = `You are the bookkeeper behind the personal finance bot that Kevin and Mey share on Telegram. They live in Bali; amounts are Indonesian rupiah.
+Read the message (a sentence, a screenshot, a photo of a receipt, or a PDF statement) and return what to record.
+
+Who and whose:
+- Each pos belongs to Bersama (shared household spending of Kevin and Mey) or to one person. You get the sender, where the message was sent, and the pos the sender may use (Bersama pos and the sender's own pos), each marked with its owner.
+- In the shared group chat, spending is shared: use a Bersama pos unless the message clearly says it is only the sender's ("kopi aku sendiri", "buat aku").
+- In a private chat, spending is the sender's own, unless it is clearly shared: words like bersama, berdua, kita, untuk rumah, or a kind of spending that only has a Bersama pos (groceries, rent, utilities).
+- Never choose a pos that is not in the list. If the right kind of pos exists only for the other person, make a new pos for the sender (pos_is_new, pos_owner "self").
+- "Kevin" and "Mey" in the message are people, not merchants.
 
 Rules:
 - Rupiah shorthand: "25rb"/"25k" = 25000, "1,5jt"/"1.5jt" = 1500000, "2M"/"2 miliar" = 2000000000. Indonesian screenshots use "." as thousands separator ("Rp45.000" = 45000).
 - A receipt or invoice is ONE expense for the total paid (after discounts, incl. tax/service), with the merchant and a short note of the main items.
 - A bank mutation, e-wallet history or statement lists many transactions: one item per line. Debits are expenses, credits are income.
-  Do not record moves between Kevin's own pockets: transfers to his own accounts, e-wallet top-ups, credit-card bill payments, cash withdrawals; mention them in "skipped".
+  Do not record moves between the sender's own pockets: transfers to their own accounts or between Kevin and Mey, e-wallet top-ups, credit-card bill payments, cash withdrawals; mention them in "skipped".
   A transfer to an exchange or a deposito/fund purchase is not an expense: record it as btc_buy or investment if the details are there, otherwise skip it and say so.
 - Choose the pos from the existing list whenever one fits, spelled exactly. Make a new pos only for spending that clearly fits none of them, with the right period.
 - Dates: use the date shown; for "kemarin", "tadi pagi", "senin" etc. work it out from today; otherwise today.
 - Bitcoin: screenshots from Indodax, Pintu, Tokocrypto, Binance, Reku etc. give the BTC amount and the rupiah total; a sentence like "beli btc 0,002 seharga 3,1jt" too.
 - Investments: deposito, reksa dana, SBN/ORI/SR, obligasi, P2P, high-interest savings, with principal, rate % per year, tenor and start date.
 - "buat pos Kopi harian budget 50rb" or "budget makan 150rb sehari" is a pos item (create or change a category and its budget).
-- If Kevin only asks something ("pengeluaran minggu ini berapa?", "harga btc?"), return no items and set query.
+- If the sender only asks something ("pengeluaran minggu ini berapa?", "harga btc?"), return no items and set query.
 - If an amount is in another currency, or the image is unreadable, do not guess: leave it out and explain in "reply" or "skipped".
 - Write notes, skipped and reply in short, plain Indonesian.`;
 
-/** Turns Kevin's message into { items, query, skipped, reply }. `media` is { media_type, data(base64) } for a photo or PDF. */
-export async function parseMessage(env, { text, media, today, pos }) {
+/** Turns a message from Kevin or Mey into { items, query, skipped, reply }. `media` is { media_type, data(base64) } for a photo or PDF. */
+export async function parseMessage(env, { text, media, today, pos, sender = 'Kevin', where = 'private' }) {
   if (!env.ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY belum diisi di worker likuloka-kantor');
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, ...(env.ANTHROPIC_BASE_URL ? { baseURL: env.ANTHROPIC_BASE_URL } : {}) });
   const content = [];
   if (media?.media_type === 'application/pdf') content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: media.data } });
   else if (media) content.push({ type: 'image', source: { type: 'base64', media_type: media.media_type, data: media.data } });
-  const posList = pos.map(p => `- ${p.name} (${p.period})`).join('\n');
-  content.push({ type: 'text', text: `Today (WITA): ${today}\nExisting pos:\n${posList}\n\nKevin's message: ${text ? text : media ? '(only the attachment)' : '(empty)'}` });
+  const posList = pos.map(p => `- ${p.name} (${p.period}, owner: ${p.owner === 'bersama' ? 'Bersama' : sender})`).join('\n');
+  const place = where === 'group' ? 'the shared group chat of Kevin and Mey' : `${sender}'s private chat`;
+  content.push({ type: 'text', text: `Today (WITA): ${today}\nSender: ${sender}, in ${place}\nPos ${sender} may use:\n${posList}\n\n${sender}'s message: ${text ? text : media ? '(only the attachment)' : '(empty)'}` });
   const messages = [{ role: 'user', content }];
   try {
     return await readWith(client, MODEL, messages, media ? 'medium' : 'low');

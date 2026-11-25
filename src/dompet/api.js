@@ -1,12 +1,13 @@
 // /api/dompet*: the Dompet page (public/dompet.html). Behind the Kantor sign-in (KANTOR_EMAILS only).
 import { body, json, witaDate } from '../common.js';
-import { addBtc, addTx, deleteBtc, deleteTx, listTx, posWithSpend, saveInvest, savePos, series, totals, updateTx } from './db.js';
+import { addBtc, addTx, deleteBtc, deleteTx, ensureSchema, listTx, posWithSpend, saveInvest, savePos, series, totals, updateTx } from './db.js';
 import { addDays } from './invest.js';
 import { dailyRecap, portfolio } from './report.js';
 import { send, setRecap, setupBot, status, telegramFile, tgState, unpair } from './telegram.js';
 
 export async function dompetApi(req, env, url) {
   const p = url.pathname, m = req.method, today = witaDate();
+  await ensureSchema(env);
   if (p === '/api/dompet' && m === 'GET') {
     const from = url.searchParams.get('from') || addDays(today, -62);
     const [t, pos, s, tx, porto, prices, bot] = await Promise.all([totals(env, today), posWithSpend(env, today, { all: true }), series(env, today),
@@ -35,7 +36,7 @@ export async function dompetApi(req, env, url) {
     const d = await body(req);
     try {
       switch (d.action) {
-        case 'tx_add': return json({ ok: true, ...(await addTx(env, { ...d, source: 'web' })) });
+        case 'tx_add': return json({ ok: true, ...(await addTx(env, { ...d, member: d.member || 'kevin', source: 'web' })) });
         case 'tx_update': return json({ ok: true, tx: await updateTx(env, d.id, d) });
         case 'tx_delete': await deleteTx(env, d.id); return json({ ok: true });
         case 'pos_save': return json({ ok: true, pos: await savePos(env, d) });
@@ -51,13 +52,15 @@ export async function dompetApi(req, env, url) {
         case 'inv_save': return json({ ok: true, invest: await saveInvest(env, d) });
         case 'inv_close': await env.DB.prepare('UPDATE dompet_invest SET closed_at = ? WHERE id = ?').bind(d.reopen ? null : (d.date || today) + 'T00:00:00Z', Number(d.id)).run(); return json({ ok: true });
         case 'inv_delete': await env.DB.prepare('DELETE FROM dompet_invest WHERE id = ?').bind(Number(d.id)).run(); return json({ ok: true });
-        case 'bot_setup': return json({ ok: true, bot: await setupBot(env, url.origin) });
-        case 'bot_unpair': await unpair(env); return json({ ok: true, bot: await status(env) });
+        case 'bot_setup': return json({ ok: true, bot: await setupBot(env, url.origin, d.who || 'kevin') });
+        case 'bot_webhook': return json({ ok: true, bot: await setupBot(env, url.origin, null) });
+        case 'bot_unpair': await unpair(env, d.who); return json({ ok: true, bot: await status(env) });
         case 'bot_recap': await setRecap(env, d.on); return json({ ok: true, bot: await status(env) });
         case 'bot_test': {
+          // Kevin's recap to Kevin's chat (Mey's arrives with the evening run).
           const s = await tgState(env);
-          if (!s.chat) return json({ error: 'Bot belum tersambung ke chat' }, 400);
-          await send(env, s.chat.id, await dailyRecap(env));
+          if (!s.chats.kevin) return json({ error: 'Chat Kevin belum tersambung' }, 400);
+          await send(env, s.chats.kevin.id, await dailyRecap(env, today, 'kevin'));
           return json({ ok: true });
         }
         default: return json({ error: 'Aksi tidak dikenal' }, 400);

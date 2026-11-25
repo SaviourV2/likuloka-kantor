@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS villa_payouts (
   email_date    TEXT NOT NULL
 );
 
--- Dompet: Kevin's personal finance (Telegram bot + /dompet page). Money here is Kevin's only (KANTOR_EMAILS).
+-- Dompet: personal finance of Kevin and Mey (Telegram bot; the /dompet page is Kevin's only, KANTOR_EMAILS).
 -- Amounts are whole rupiah. Dates are YYYY-MM-DD in WITA.
 CREATE TABLE IF NOT EXISTS dompet_pos (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS dompet_pos (
   period     TEXT NOT NULL DEFAULT 'monthly',    -- daily | weekly | monthly: the rhythm of this spending and its budget
   budget     INTEGER,                            -- rupiah per period; NULL = no budget
   archived   INTEGER NOT NULL DEFAULT 0,
+  owner      TEXT NOT NULL DEFAULT 'kevin',      -- bersama | kevin | mey (added later: src/dompet/db.js ensureSchema)
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS dompet_tx (
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS dompet_tx (
   tg_file_id  TEXT,                              -- Telegram file of the screenshot (fetched again on demand; not stored here)
   tg_chat_msg INTEGER,
   fingerprint TEXT,                              -- date|amount|merchant, to flag likely duplicates
+  member      TEXT,                              -- kevin | mey: who recorded it (added later, see ensureSchema)
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS dompet_tx_date ON dompet_tx (date);

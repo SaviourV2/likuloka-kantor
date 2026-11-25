@@ -140,8 +140,9 @@ export default {
   // 13:00 UTC = 21:00 WITA: the Dompet's evening recap on Telegram, and today's BTC / IHSG / portfolio closes.
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
-      const r = await sendDailyRecap(env).catch(e => { console.error('dompet recap', e); return { error: e.message }; });
-      if (!r.ok) { const p = await portfolio(env); await snapshotPrices(env, p.market, p.partial ? null : p.total); }
+      await sendDailyRecap(env).catch(e => console.error('dompet recap', e));
+      const p = await portfolio(env);
+      await snapshotPrices(env, p.market, p.partial ? null : p.total);
     })().catch(e => console.error('dompet cron', e)));
   },
 };
